@@ -88,6 +88,94 @@ CREATE TABLE planning_runs (
 
 CREATE INDEX idx_planning_runs_site ON planning_runs(site_id, started_at DESC);
 
+-- ===== REPLANIFICATION D'URGENCE (déplacement de mission) =====
+-- Journalise chaque décision de déplacement, avec le détail du calcul de coût,
+-- pour audit par le chef d'usine. Voir docs/planning_rules.md section 4.
+CREATE TABLE mission_replanning_events (
+  event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  triggering_request_id UUID NOT NULL REFERENCES maintenance_requests(request_id),
+  -- la demande d'urgence à l'origine du déplacement
+  displaced_mission_id UUID REFERENCES missions(mission_id),
+  -- la mission déplacée (NULL si stratégie "créneau libre" ou "heures sup", aucun déplacement réel)
+  strategy VARCHAR(30) NOT NULL CHECK (strategy IN (
+    'free_slot','swap_lower_priority','move_single_mission',
+    'shift_multiple_missions','overtime','postpone_next_week'
+  )),
+  cost_breakdown JSONB NOT NULL,
+  -- {"missions_moved": 1, "overtime_hours": 0, "extra_travel_hours": 0.5,
+  --  "sla_delay_hours": 2, "production_impact_score": 0, "total_cost": 21}
+  old_mission_date DATE,
+  new_mission_date DATE,
+  planning_run_id UUID REFERENCES planning_runs(run_id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_replanning_triggering ON mission_replanning_events(triggering_request_id);
+CREATE INDEX idx_replanning_displaced ON mission_replanning_events(displaced_mission_id);
+
+-- Notification automatique aux 3 destinataires obligatoires (demandeur, direction
+-- de l'entité, électricien) dès qu'une mission est effectivement déplacée.
+CREATE OR REPLACE FUNCTION notify_mission_displacement()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_request RECORD;
+  v_technician_user UUID;
+  v_direction RECORD;
+  v_msg TEXT;
+BEGIN
+  IF NEW.displaced_mission_id IS NULL THEN
+    RETURN NEW; -- pas de déplacement réel (créneau libre / heures sup)
+  END IF;
+
+  -- Demande dont la mission a été déplacée (via mission_interventions)
+  SELECT r.* INTO v_request
+  FROM mission_interventions mi
+  JOIN maintenance_requests r ON r.request_id = mi.request_id
+  WHERE mi.mission_id = NEW.displaced_mission_id
+  LIMIT 1;
+
+  IF v_request IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  v_msg := format(
+    'Votre intervention a été replanifiée (urgence sécurité traitée en priorité). Ancien créneau : %s, nouveau créneau : %s.',
+    NEW.old_mission_date, NEW.new_mission_date
+  );
+
+  -- 1) Le demandeur
+  IF v_request.requested_by IS NOT NULL THEN
+    INSERT INTO notifications (request_id, level, recipient_user_id, channel, message, status_at_trigger)
+    VALUES (v_request.request_id, 'escalation', v_request.requested_by, 'app', v_msg, 'mission_displaced');
+  END IF;
+
+  -- 2) Le ou les responsables direction de l'entité émettrice
+  FOR v_direction IN
+    SELECT dea.user_id FROM direction_entity_assignments dea
+    WHERE dea.entity_id = v_request.issuing_entity_id
+  LOOP
+    INSERT INTO notifications (request_id, level, recipient_user_id, channel, message, status_at_trigger)
+    VALUES (v_request.request_id, 'escalation', v_direction.user_id, 'app', v_msg, 'mission_displaced');
+  END LOOP;
+
+  -- 3) L'électricien assigné
+  IF v_request.assigned_technician_id IS NOT NULL THEN
+    SELECT up.user_id INTO v_technician_user
+    FROM user_profiles up WHERE up.technician_id = v_request.assigned_technician_id LIMIT 1;
+    IF v_technician_user IS NOT NULL THEN
+      INSERT INTO notifications (request_id, level, recipient_user_id, channel, message, status_at_trigger)
+      VALUES (v_request.request_id, 'escalation', v_technician_user, 'app', v_msg, 'mission_displaced');
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_notify_mission_displacement
+AFTER INSERT ON mission_replanning_events
+FOR EACH ROW EXECUTE FUNCTION notify_mission_displacement();
+
 -- ===== ACHATS / FOURNISSEURS =====
 
 -- Sociétés du groupe pouvant émettre un bon de commande (paramétrable par la direction)
@@ -699,6 +787,18 @@ FOR SELECT USING (auth.uid() IS NOT NULL);
 CREATE POLICY planning_config_write ON planning_engine_config
 FOR ALL USING (
   EXISTS (SELECT 1 FROM user_profiles up WHERE up.user_id = auth.uid() AND up.role IN ('admin','direction'))
+);
+
+-- Replanification d'urgence : lecture par site (ou direction/admin) ; écriture réservée au job système
+ALTER TABLE mission_replanning_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY replanning_events_select ON mission_replanning_events
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM maintenance_requests r
+    JOIN user_profiles up ON up.user_id = auth.uid()
+    WHERE r.request_id = mission_replanning_events.triggering_request_id
+      AND (up.site_id = r.site_id OR up.role IN ('direction','admin'))
+  )
 );
 
 -- Lecture : son propre site, ou rôle direction/admin (multi-site)

@@ -168,6 +168,37 @@ export interface PlanningEngineConfig {
   updated_at: string;
 }
 
+// ============================================================
+// Replanification d'urgence (déplacement de mission)
+// ============================================================
+
+export type ReplanningStrategy =
+  | 'free_slot'
+  | 'swap_lower_priority'
+  | 'move_single_mission'
+  | 'shift_multiple_missions'
+  | 'overtime'
+  | 'postpone_next_week';
+
+export interface MissionReplanningEvent {
+  event_id: string;
+  triggering_request_id: string;
+  displaced_mission_id: string | null;
+  strategy: ReplanningStrategy;
+  cost_breakdown: {
+    missions_moved: number;
+    overtime_hours: number;
+    extra_travel_hours: number;
+    sla_delay_hours: number;
+    production_impact_score: number;
+    total_cost: number;
+  };
+  old_mission_date: string | null;
+  new_mission_date: string | null;
+  planning_run_id: string | null;
+  created_at: string;
+}
+
 /** Seuils d'alerte par statut, paramétrables par la direction (table workflow_status_rules). */
 export interface WorkflowStatusRule {
   status: RequestStatus;

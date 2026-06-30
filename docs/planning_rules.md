@@ -26,8 +26,8 @@ Le moteur ne considère que les demandes au statut `ready_to_plan`, groupées **
 ### Règle 2 — Tri par priorité
 Les demandes sont triées par `priority_score` décroissant (formule déjà définie : 35% sécurité/urgence, 25% SLA, 20% criticité équipement, 10% pannes répétées, 10% ancienneté).
 
-### Règle 3 — Compatibilité compétence
-Une demande n'est assignée qu'à un technicien possédant le `skill_id` requis (`technician_skills`), avec un niveau suffisant si vous voulez ajouter cette granularité plus tard (actuellement non discriminant, juste présence du skill).
+### Règle 3 — Compatibilité compétence (simplifiée)
+Une demande n'est assignée qu'à un technicien possédant le `skill_id` requis (`technician_skills`). **Aucun niveau minimal n'est exigé** : la présence du technicien dans le système avec ce skill suffit — s'il est enregistré avec cette compétence, on considère qu'il est habilité. *(Décision actée : simplifie le moteur, évite une granularité inutile en exploitation réelle.)*
 
 ### Règle 4 — Capacité journalière (points)
 Chaque technicien a une capacité maximale de points par jour (`max_daily_capacity_points`). Le moteur ne dépasse jamais cette capacité sur une même journée. Une demande de 5 points (Type 3) ne peut être ajoutée à une mission si la capacité restante est inférieure à 5.
@@ -52,16 +52,58 @@ Chaque mission créée porte `planning_run_id`, qui pointe vers l'exécution exa
 
 ---
 
-## 3. Ce qui reste à trancher avec vous
+## 3. Décisions actées
 
-| Question | Pourquoi elle compte |
+| Question | Décision |
 |---|---|
-| Le run hebdomadaire doit-il aussi re-essayer les demandes en `unassigned_reason` des semaines précédentes ? | Sinon une demande non assignée une fois risque de rester bloquée indéfiniment |
-| Faut-il un niveau de compétence minimal (`technician_skills.level`) discriminant, ou la simple présence du skill suffit ? | Impacte la règle 3 — actuellement non exploité |
-| Le run `emergency` doit-il pouvoir **déplacer** une intervention déjà planifiée (non urgente) pour faire de la place à une urgence sécurité ? | Sinon une urgence peut rester bloquée si tous les techniciens sont déjà pleins ce jour-là |
+| Réessai des demandes non assignées | **Oui** — chaque run hebdomadaire reprend automatiquement les demandes encore `ready_to_plan` issues de runs précédents (pas seulement les nouvelles), avec leur `priority_score` recalculé (l'ancienneté augmente le score, donc elles remontent naturellement) |
+| Niveau de compétence minimal | **Supprimé** — présence du skill dans `technician_skills` suffit, pas de granularité de niveau exigée pour l'assignation |
+| Déplacement d'une mission déjà planifiée pour une urgence sécurité | **Oui** — voir moteur de replanification ci-dessous |
 
 ---
 
-## 4. Erreur à éviter
+## 4. Moteur de replanification d'urgence
+
+Quand une demande `safety_risk` ou `production_stop` est approuvée et qu'aucun créneau libre n'existe, le système peut déplacer une mission déjà planifiée non urgente. Cette décision n'est jamais arbitraire : elle est **chiffrée et journalisée**.
+
+### 4.1 Fonction de coût
+
+Pour chaque solution candidate, le moteur calcule :
+
+```
+Coût = (nombre d'interventions déplacées × 10)
+     + (heures supplémentaires générées × 8)
+     + (temps de déplacement supplémentaire en heures × 2)
+     + (retard généré sur SLA × 20)
+     + (impact production estimé × 30)
+```
+
+Le planning retenu est celui dont le **coût total est minimal**. Chaque composante est enregistrée dans `mission_replanning_events.cost_breakdown` (traçabilité complète — le chef d'usine peut auditer pourquoi telle mission a été déplacée plutôt qu'une autre).
+
+### 4.2 Ordre de priorité des stratégies testées
+
+Le moteur teste les stratégies dans cet ordre, et retient la première qui donne un coût acceptable (ou la moins coûteuse si plusieurs sont testées en parallèle) :
+
+1. **Utiliser un créneau libre** — aucun déplacement, coût quasi nul
+2. **Échanger avec une intervention de priorité inférieure** du même technicien le même jour
+3. **Déplacer uniquement la mission concernée** (la plus proche en priorité de l'urgence)
+4. **Décaler plusieurs missions** si cela réduit le coût global par rapport à un déplacement isolé mal positionné
+5. **Autoriser des heures supplémentaires** pour absorber l'urgence sans rien déplacer
+6. **Dernier recours : reporter une intervention à la semaine suivante**
+
+Cette approche reproduit la logique des logiciels APS (Advanced Planning & Scheduling) : elle limite les perturbations, respecte les priorités déjà établies, et évite une règle fixe de décalage systématique qui dégraderait inutilement le planning.
+
+### 4.3 Notification obligatoire en cas de déplacement
+
+Toute mission déplacée déclenche une notification immédiate (canal `app`, niveau `escalation` pour traçabilité) à **trois destinataires** :
+- le **demandeur** de la demande déplacée (son intervention est retardée)
+- le **responsable direction de l'entité juridique** de la demande déplacée (visibilité sur l'impact)
+- l'**électricien** concerné (son planning change)
+
+La notification précise : ancien créneau, nouveau créneau, raison du déplacement (urgence sécurité X), et lien vers `mission_replanning_events` pour le détail du calcul de coût.
+
+---
+
+## 5. Erreur à éviter
 
 Ne pas laisser le moteur "réessayer indéfiniment en silence" une demande non assignable sans alerte — sans la règle 8 + 9, le système peut sembler fonctionner alors qu'il accumule un arriéré invisible. La traçabilité (`planning_runs`) existe précisément pour empêcher ça.
