@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { ENTITY_LIST, getAllSites, entitySitesLabel } from '@/lib/entities';
+import { ENTITY_LIST, getAllSites, entitySitesLabel, getEntitiesForSite } from '@/lib/entities';
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Tab = 'sites' | 'entities' | 'prestataires' | 'users' | 'objectifs';
+type Tab = 'sites' | 'entities' | 'prestataires' | 'users' | 'objectifs' | 'alertes';
 
 type UserRoleType = 'admin' | 'directeur_general' | 'directeur_de_site' | 'electricien' | 'demandeur';
 
@@ -77,16 +77,43 @@ function validateEntityVsGroup(e: EntityKpiTargets, g: GroupKpiTargets): string[
 }
 
 // ── Mock data ──────────────────────────────────────────────────────────────
-interface SiteItem { id: string; label: string; entityCode: string; entityName: string; active: boolean; }
+interface SiteItem {
+  id: string;
+  label: string;
+  city: string;
+  entityCodes: string[]; // entités présentes sur ce site
+  active: boolean;
+}
 
-// Tous les sites physiques du groupe, dérivés de ENTITY_LIST
+interface SiteKpiTargets {
+  siteId: string;
+  mttr_max_h: number;
+  sla48_min_pct: number;
+  first_fix_min_pct: number;
+  grouping_min_pct: number;
+  budget_annuel: number;
+}
+
+// Sites générés depuis SITES_LIST (la source de vérité)
 const MOCK_SITES: SiteItem[] = getAllSites().map(s => ({
-  id:         s.id,
-  label:      `${s.label}, ${s.city}`,
-  entityCode: s.entityCode,
-  entityName: s.entityName,
-  active:     true,
+  id:          s.id,
+  label:       s.label,
+  city:        s.city,
+  entityCodes: s.entityCodes,
+  active:      true,
 }));
+
+const SITE_TARGETS_INIT: SiteKpiTargets[] = [
+  { siteId: 'ben-arous',   mttr_max_h: 40, sla48_min_pct: 88, first_fix_min_pct: 86, grouping_min_pct: 68, budget_annuel: 140000 },
+  { siteId: 'la-manouba',  mttr_max_h: 35, sla48_min_pct: 92, first_fix_min_pct: 88, grouping_min_pct: 72, budget_annuel:  50000 },
+  { siteId: 'jbel-oust',   mttr_max_h: 48, sla48_min_pct: 84, first_fix_min_pct: 79, grouping_min_pct: 55, budget_annuel:  45000 },
+  { siteId: 'grombalia',   mttr_max_h: 52, sla48_min_pct: 80, first_fix_min_pct: 82, grouping_min_pct: 62, budget_annuel:  95000 },
+  { siteId: 'beni-khaled', mttr_max_h: 52, sla48_min_pct: 78, first_fix_min_pct: 82, grouping_min_pct: 68, budget_annuel: 110000 },
+  { siteId: 'megrine',     mttr_max_h: 30, sla48_min_pct: 93, first_fix_min_pct: 91, grouping_min_pct: 79, budget_annuel:  20000 },
+  { siteId: 'rades',       mttr_max_h: 38, sla48_min_pct: 89, first_fix_min_pct: 88, grouping_min_pct: 67, budget_annuel:  30000 },
+  { siteId: 'carthage',    mttr_max_h: 40, sla48_min_pct: 88, first_fix_min_pct: 86, grouping_min_pct: 65, budget_annuel:  40000 },
+  { siteId: 'la-marsa',    mttr_max_h: 42, sla48_min_pct: 86, first_fix_min_pct: 85, grouping_min_pct: 63, budget_annuel:  15000 },
+];
 
 const MOCK_ENTITIES: EntityDetail[] = [
   { id: '1', code: 'LAD',   name: 'LAD',   full_name: 'Société LAD',            address: 'Zone Industrielle Charguia II, 2035 Ariana',      phone: '+216 71 234 000', matricule_fiscale: '1234567/A/M/000', active: true },
@@ -150,87 +177,126 @@ const ENTITY_TARGETS_INIT: EntityKpiTargets[] = [
   { entity: 'K&Ko',  mttr_max_h: 40, sla48_min_pct: 88, first_fix_min_pct: 86, grouping_min_pct: 65, budget_annuel: 45000  },
 ];
 
-// ── Site row (inline edit + toggle + delete) ───────────────────────────────
-function SiteRow({ site, onSave, onToggle, onDelete }: {
+// ── Site card (inline edit + entity chips + toggle + delete) ──────────────
+function SiteCard({ site, onSave, onToggle, onDelete }: {
   site: SiteItem;
-  onSave: (label: string) => void;
+  onSave: (updated: SiteItem) => void;
   onToggle: () => void;
   onDelete: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft]     = useState(site.label);
-  const [saved, setSaved]     = useState(false);
+  const [editing, setEditing]       = useState(false);
+  const [draft, setDraft]           = useState(site);
+  const [saved, setSaved]           = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  function startEdit() {
-    setDraft(site.label);
-    setEditing(true);
-    setTimeout(() => inputRef.current?.focus(), 50);
-  }
+  function startEdit() { setDraft(site); setEditing(true); }
 
   function handleSave() {
-    if (!draft.trim() || draft.trim() === site.label) { setEditing(false); return; }
-    onSave(draft.trim());
+    if (!draft.label.trim()) return;
+    onSave(draft);
     setSaved(true);
     setTimeout(() => { setSaved(false); setEditing(false); }, 1200);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') handleSave();
-    if (e.key === 'Escape') { setDraft(site.label); setEditing(false); }
+  function toggleEntity(code: string) {
+    setDraft(prev => ({
+      ...prev,
+      entityCodes: prev.entityCodes.includes(code)
+        ? prev.entityCodes.filter(c => c !== code)
+        : [...prev.entityCodes, code],
+    }));
+  }
+
+  if (editing) {
+    return (
+      <li className="px-5 py-4 bg-slate-50 border-b border-slate-100 last:border-0">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <input type="text" value={draft.label} onChange={e => setDraft(d => ({ ...d, label: e.target.value }))}
+              placeholder="Libellé du site *"
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+            <input type="text" value={draft.city} onChange={e => setDraft(d => ({ ...d, city: e.target.value }))}
+              placeholder="Ville"
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+          </div>
+          <div className="border border-slate-200 rounded-lg p-3 bg-white">
+            <div className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Entités présentes sur ce site</div>
+            <div className="flex flex-wrap gap-1.5">
+              {ENTITY_LIST.map(e => {
+                const checked = draft.entityCodes.includes(e.code);
+                return (
+                  <label key={e.code} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer text-xs font-medium transition-colors border ${checked ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleEntity(e.code)} className="hidden" />
+                    <span className="font-bold">{e.code}</span>
+                    <span className={checked ? 'text-slate-400' : 'text-slate-400'}>{e.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setEditing(false)} className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">Annuler</button>
+            <button onClick={handleSave} disabled={!draft.label.trim()}
+              className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 ${saved ? 'bg-green-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
+              {saved ? '✓ Enregistré' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+      </li>
+    );
   }
 
   return (
-    <li className="flex items-center gap-3 px-5 py-3 group border-b border-slate-100 last:border-0">
-      {editing ? (
-        <>
-          <input
-            ref={inputRef}
-            type="text"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-900"
-          />
-          <button onClick={handleSave}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
-            {saved ? '✓ Enregistré' : 'Enregistrer'}
-          </button>
-          <button onClick={() => { setDraft(site.label); setEditing(false); }}
-            className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
-            Annuler
-          </button>
-        </>
-      ) : (
-        <>
-          <span className={`flex-1 text-sm ${site.active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
-            {site.label}
-          </span>
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={startEdit} className="text-xs text-blue-600 hover:text-blue-800 font-medium">
-              Modifier
-            </button>
-            {confirmDel ? (
-              <>
-                <span className="text-xs text-red-600">Supprimer ?</span>
-                <button onClick={onDelete} className="text-xs font-semibold text-red-600 hover:text-red-800">Oui</button>
-                <button onClick={() => setConfirmDel(false)} className="text-xs text-slate-400 hover:text-slate-600">Non</button>
-              </>
-            ) : (
-              <button onClick={() => setConfirmDel(true)} className="text-xs text-slate-400 hover:text-red-500 transition-colors">
+    <li className="px-5 py-4 group border-b border-slate-100 last:border-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-sm font-semibold ${site.active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+              {site.label}
+            </span>
+            {site.city && (
+              <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">📍 {site.city}</span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {site.entityCodes.map(code => {
+              const e = ENTITY_LIST.find(x => x.code === code);
+              return e ? (
+                <span key={code} className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium border border-blue-100">
+                  <span className="font-bold">{e.code}</span>
+                  <span className="text-blue-500 hidden sm:inline">{e.name}</span>
+                </span>
+              ) : null;
+            })}
+            {site.entityCodes.length === 0 && (
+              <span className="text-xs text-slate-300 italic">Aucune entité associée</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {confirmDel ? (
+            <>
+              <span className="text-xs text-red-600 mr-1">Supprimer ?</span>
+              <button onClick={onDelete} className="text-xs px-2.5 py-1 bg-red-500 text-white rounded-lg font-medium">Oui</button>
+              <button onClick={() => setConfirmDel(false)} className="text-xs px-2.5 py-1 border border-slate-200 text-slate-600 rounded-lg">Non</button>
+            </>
+          ) : (
+            <>
+              <button onClick={startEdit} className="text-xs text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-slate-100">
+                Modifier
+              </button>
+              <button onClick={() => setConfirmDel(true)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
-            )}
-          </div>
-          <button onClick={onToggle}
-            className={`text-xs px-2.5 py-1 rounded-full shrink-0 ${site.active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-            {site.active ? 'Actif' : 'Désactivé'}
-          </button>
-        </>
-      )}
+              <button onClick={onToggle} className={`text-xs px-2.5 py-1 rounded-full ${site.active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                {site.active ? 'Actif' : 'Désactivé'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </li>
   );
 }
@@ -411,9 +477,9 @@ function UserRow({ user, sites, onSave, onToggle }: {
                   <label className="block text-xs font-medium text-slate-600 mb-1">Site d&apos;affectation</label>
                   <select value={draft.site} onChange={e => setD('site', e.target.value)} className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white">
                     <option value="—">—</option>
-                    {sites.filter(s => s.entityCode === draft.entity).map(s => <option key={s.id} value={s.label}>{s.label}</option>)}
-                    {sites.filter(s => s.entityCode === draft.entity).length === 0 &&
-                      sites.map(s => <option key={s.id} value={s.label}>{s.entityCode} — {s.label}</option>)}
+                    {sites.filter(s => s.entityCodes.includes(draft.entity)).map(s => <option key={s.id} value={s.label}>{s.label}</option>)}
+                    {sites.filter(s => s.entityCodes.includes(draft.entity)).length === 0 &&
+                      sites.map(s => <option key={s.id} value={s.label}>{s.entityCodes.join(', ')} — {s.label}</option>)}
                   </select>
                 </div>
               )}
@@ -507,9 +573,9 @@ function AddUserForm({ sites, onAdd }: { sites: typeof MOCK_SITES; onAdd: (u: Ap
             <label className="block text-xs font-medium text-slate-600 mb-1">Site</label>
             <select value={form.site} onChange={e => setF('site', e.target.value)} className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white">
               <option value="">—</option>
-              {sites.filter(s => s.entityCode === form.entity).map(s => <option key={s.id} value={s.label}>{s.label}</option>)}
-              {sites.filter(s => s.entityCode === form.entity).length === 0 &&
-                sites.map(s => <option key={s.id} value={s.label}>{s.entityCode} — {s.label}</option>)}
+              {sites.filter(s => s.entityCodes.includes(form.entity)).map(s => <option key={s.id} value={s.label}>{s.label}</option>)}
+              {sites.filter(s => s.entityCodes.includes(form.entity)).length === 0 &&
+                sites.map(s => <option key={s.id} value={s.label}>{s.entityCodes.join(', ')} — {s.label}</option>)}
             </select>
           </div>
         )}
@@ -833,17 +899,112 @@ function EntityTargetRow({ target, group, canEdit, onSave }: {
   );
 }
 
+// ── Site target row ────────────────────────────────────────────────────────
+function SiteTargetRow({ target, group, onSave }: {
+  target: SiteKpiTargets;
+  group: GroupKpiTargets;
+  onSave: (t: SiteKpiTargets) => void;
+}) {
+  const [open, setOpen]   = useState(false);
+  const [draft, setDraft] = useState(target);
+  const [saved, setSaved] = useState(false);
+  const site = getAllSites().find(s => s.id === target.siteId);
+  const entities = getEntitiesForSite(target.siteId);
+
+  function setT<K extends keyof SiteKpiTargets>(k: K, v: number) {
+    setDraft(prev => ({ ...prev, [k]: v }));
+  }
+  function handleSave() {
+    onSave(draft); setSaved(true);
+    setTimeout(() => { setSaved(false); setOpen(false); }, 1200);
+  }
+
+  const violations = [
+    draft.mttr_max_h > group.mttr_max_h && `MTTR (≤ ${draft.mttr_max_h}h) dépasse le plafond groupe`,
+    draft.sla48_min_pct < group.sla48_min_pct && `SLA 48h (≥ ${draft.sla48_min_pct}%) sous le plancher groupe`,
+    draft.first_fix_min_pct < group.first_fix_min_pct && `1er passage sous le plancher groupe`,
+    draft.grouping_min_pct < group.grouping_min_pct && `Groupage sous le plancher groupe`,
+  ].filter(Boolean) as string[];
+
+  return (
+    <div className={`rounded-xl border overflow-hidden ${violations.length > 0 ? 'border-red-200' : 'border-slate-200'}`}>
+      <div className={`px-4 py-3 flex items-center gap-3 ${violations.length > 0 ? 'bg-red-50' : 'bg-white'}`}>
+        <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+          <svg className={`w-3.5 h-3.5 shrink-0 transition-transform text-slate-400 ${open ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <div className="min-w-0">
+            <div className="font-semibold text-slate-900 text-sm">{site?.label ?? target.siteId}</div>
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span className="text-xs text-slate-400">📍 {site?.city}</span>
+              {entities.map(e => (
+                <span key={e.code} className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">{e.code}</span>
+              ))}
+            </div>
+          </div>
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {violations.length === 0
+            ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ OK</span>
+            : <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">⚠ {violations.length} écart{violations.length > 1 ? 's' : ''}</span>
+          }
+          <button onClick={() => { setDraft(target); setOpen(o => !o); }} className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+            {open ? 'Fermer' : 'Modifier'}
+          </button>
+        </div>
+      </div>
+      {open && (
+        <div className="border-t border-slate-100 bg-slate-50 p-4 space-y-3">
+          {violations.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1">
+              {violations.map(v => <div key={v} className="text-xs text-red-700">• {v}</div>)}
+            </div>
+          )}
+          {[
+            { label: 'MTTR max', key: 'mttr_max_h' as const, unit: 'h', prefix: '≤', min: 1, max: 200 },
+            { label: 'SLA 48h minimum', key: 'sla48_min_pct' as const, unit: '%', prefix: '≥', min: 50, max: 100 },
+            { label: '1er passage minimum', key: 'first_fix_min_pct' as const, unit: '%', prefix: '≥', min: 50, max: 100 },
+            { label: 'Groupage minimum', key: 'grouping_min_pct' as const, unit: '%', prefix: '≥', min: 30, max: 100 },
+            { label: 'Budget annuel', key: 'budget_annuel' as const, unit: 'TND', prefix: '≤', min: 1000, max: 999999 },
+          ].map(({ label, key, unit, prefix, min, max }) => (
+            <div key={key} className="flex items-center gap-2">
+              <span className="flex-1 text-xs text-slate-600">{label}</span>
+              <span className="text-xs text-slate-400">{prefix}</span>
+              <input type="number" value={draft[key]} min={min} max={max}
+                onChange={e => setT(key, Number(e.target.value))}
+                className="w-28 text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-right focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+              <span className="text-xs text-slate-500 w-10">{unit}</span>
+            </div>
+          ))}
+          <div className="flex gap-2 justify-end pt-2 border-t border-slate-200">
+            <button onClick={() => { setDraft(target); setOpen(false); }} className="text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">Annuler</button>
+            <button onClick={handleSave} disabled={violations.length > 0}
+              className={`text-sm px-4 py-2 rounded-lg font-medium ${saved ? 'bg-green-600 text-white' : violations.length > 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
+              {saved ? '✓ Enregistré' : violations.length > 0 ? 'Corriger les écarts' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Objectifs tab ──────────────────────────────────────────────────────────
 function ObjectifsTab() {
-  const [viewRole, setViewRole] = useState<ViewRole>('dg');
-  const [group, setGroup]       = useState<GroupKpiTargets>(GROUP_TARGETS_INIT);
-  const [entities, setEntities] = useState<EntityKpiTargets[]>(ENTITY_TARGETS_INIT);
+  const [viewRole, setViewRole]     = useState<ViewRole>('dg');
+  const [group, setGroup]           = useState<GroupKpiTargets>(GROUP_TARGETS_INIT);
+  const [entities, setEntities]     = useState<EntityKpiTargets[]>(ENTITY_TARGETS_INIT);
+  const [siteTargets, setSiteTargets] = useState<SiteKpiTargets[]>(SITE_TARGETS_INIT);
+  const [kpiDim, setKpiDim]         = useState<'entity' | 'site'>('entity');
 
   const isDG = viewRole === 'dg';
   const totalViolations = entities.filter(e => validateEntityVsGroup(e, group).length > 0).length;
 
   function updateEntity(code: string, updated: EntityKpiTargets) {
     setEntities(prev => prev.map(e => e.entity === code ? updated : e));
+  }
+  function updateSite(siteId: string, updated: SiteKpiTargets) {
+    setSiteTargets(prev => prev.map(s => s.siteId === siteId ? updated : s));
   }
 
   const VIEW_ROLES: { key: ViewRole; label: string }[] = [
@@ -869,20 +1030,34 @@ function ObjectifsTab() {
           ))}
         </div>
         <div className="text-xs text-amber-600 mt-2">
-          {isDG ? 'Le DG voit et modifie l\'enveloppe groupe. Il voit tous les objectifs par entité (lecture seule).' : `${viewRole} voit l\'enveloppe DG en lecture seule et modifie uniquement ses propres objectifs.`}
+          {isDG ? 'Le DG définit l\'enveloppe groupe et voit les objectifs par entité et par site.' : `${viewRole} voit l\'enveloppe DG en lecture seule et modifie uniquement ses propres objectifs.`}
         </div>
       </div>
 
       {/* Group targets */}
       <GroupTargetCard targets={group} onSave={setGroup} canEdit={isDG} />
 
-      {/* Conformité résumé */}
+      {/* Dimension toggle — only for DG */}
       {isDG && (
+        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 w-fit">
+          <button onClick={() => setKpiDim('entity')}
+            className={`text-xs px-4 py-2 rounded-md font-medium transition-all ${kpiDim === 'entity' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
+            Par entité — tous sites
+          </button>
+          <button onClick={() => setKpiDim('site')}
+            className={`text-xs px-4 py-2 rounded-md font-medium transition-all ${kpiDim === 'site' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
+            Par site — toutes entités
+          </button>
+        </div>
+      )}
+
+      {/* Conformité résumé — entity view */}
+      {isDG && kpiDim === 'entity' && (
         <div className={`rounded-lg px-4 py-3 flex items-center gap-3 ${totalViolations > 0 ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
-          <span className={`text-xl ${totalViolations > 0 ? '' : ''}`}>{totalViolations > 0 ? '⚠' : '✓'}</span>
+          <span>{totalViolations > 0 ? '⚠' : '✓'}</span>
           <div className="text-sm">
             {totalViolations > 0 ? (
-              <><span className="font-semibold text-red-800">{totalViolations} entité{totalViolations > 1 ? 's' : ''} hors enveloppe</span><span className="text-red-600"> — les objectifs définis dépassent les contraintes groupe</span></>
+              <><span className="font-semibold text-red-800">{totalViolations} entité{totalViolations > 1 ? 's' : ''} hors enveloppe</span><span className="text-red-600"> — objectifs dépassent les contraintes groupe</span></>
             ) : (
               <span className="font-semibold text-green-800">Toutes les entités respectent l&apos;enveloppe groupe</span>
             )}
@@ -891,38 +1066,58 @@ function ObjectifsTab() {
       )}
 
       {/* Entity targets */}
-      <div>
-        <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Objectifs par entité</div>
-        <div className="space-y-2">
-          {entities.map(e => {
-            const canEdit = isDG ? false : viewRole === e.entity;
-            const visible = isDG ? true : viewRole === e.entity;
-            if (!visible) return null;
-            return (
-              <EntityTargetRow
-                key={e.entity}
-                target={e}
-                group={group}
-                canEdit={canEdit}
-                onSave={updated => updateEntity(e.entity, updated)}
-              />
-            );
-          })}
-          {!isDG && (
-            <div className="text-xs text-slate-400 italic pt-1">
-              Les objectifs des autres entités ne sont pas visibles depuis cette vue.
-            </div>
-          )}
+      {(kpiDim === 'entity' || !isDG) && (
+        <div>
+          <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Objectifs par entité — tous sites confondus</div>
+          <div className="space-y-2">
+            {entities.map(e => {
+              const canEdit = isDG ? false : viewRole === e.entity;
+              const visible = isDG ? true : viewRole === e.entity;
+              if (!visible) return null;
+              return (
+                <EntityTargetRow
+                  key={e.entity}
+                  target={e}
+                  group={group}
+                  canEdit={canEdit}
+                  onSave={updated => updateEntity(e.entity, updated)}
+                />
+              );
+            })}
+            {!isDG && (
+              <div className="text-xs text-slate-400 italic pt-1">
+                Les objectifs des autres entités ne sont pas visibles depuis cette vue.
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Site targets — DG only */}
+      {isDG && kpiDim === 'site' && (
+        <div>
+          <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Objectifs par site — toutes entités confondues</div>
+          <p className="text-xs text-slate-400 mb-3">KPIs agrégés pour tous les prestataires intervenant sur ce site, quelle que soit l&apos;entité émettrice.</p>
+          <div className="space-y-2">
+            {siteTargets.map(s => (
+              <SiteTargetRow
+                key={s.siteId}
+                target={s}
+                group={group}
+                onSave={updated => updateSite(s.siteId, updated)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-500 space-y-1">
         <div className="font-semibold text-slate-600 mb-1.5">Règles de cohérence</div>
-        <div>• <strong>MTTR</strong> : l&apos;objectif entité (≤ Xh) doit être <strong>inférieur ou égal</strong> à celui du groupe — plus strict est autorisé</div>
-        <div>• <strong>SLA, 1er passage, Groupage</strong> : l&apos;objectif entité (≥ X%) doit être <strong>supérieur ou égal</strong> au plancher groupe</div>
+        <div>• <strong>MTTR</strong> : objectif entité/site (≤ Xh) doit être <strong>≤ enveloppe groupe</strong></div>
+        <div>• <strong>SLA, 1er passage, Groupage</strong> : objectif entité/site (≥ X%) doit être <strong>≥ plancher groupe</strong></div>
         <div>• <strong>Budget annuel</strong> : ne peut pas dépasser le plafond par entité fixé par le DG</div>
-        <div className="mt-1 text-slate-400">Un objectif entité hors enveloppe ne peut pas être enregistré tant que l&apos;écart n&apos;est pas corrigé.</div>
+        <div className="mt-1 text-slate-400">Un objectif hors enveloppe ne peut pas être enregistré tant que l&apos;écart n&apos;est pas corrigé.</div>
       </div>
     </div>
   );
@@ -1195,6 +1390,214 @@ function PrestatairesTab({
   );
 }
 
+// ── Alertes & Escalades tab ────────────────────────────────────────────────
+interface AlertRule {
+  entity: string; // 'groupe' | entity code
+  label: string;
+  rappel_prestataire_h: number;
+  escalade_directeur_h: number;
+  escalade_dg_h: number;
+  confirmation_rappel_h: number; // rappel demandeur pour confirmer réception
+}
+
+const GROUP_ALERT_DEFAULTS: AlertRule = {
+  entity: 'groupe', label: 'Groupe Elkateb',
+  rappel_prestataire_h: 24,
+  escalade_directeur_h: 48,
+  escalade_dg_h: 72,
+  confirmation_rappel_h: 24,
+};
+
+const INITIAL_ALERT_RULES: AlertRule[] = [
+  { ...GROUP_ALERT_DEFAULTS },
+  { entity: 'LAD',   label: 'LAD',          rappel_prestataire_h: 20, escalade_directeur_h: 40, escalade_dg_h: 60, confirmation_rappel_h: 20 },
+  { entity: 'FAD',   label: 'FAD Industrie', rappel_prestataire_h: 24, escalade_directeur_h: 48, escalade_dg_h: 72, confirmation_rappel_h: 24 },
+  { entity: 'BTFI',  label: 'BTFI',          rappel_prestataire_h: 16, escalade_directeur_h: 36, escalade_dg_h: 60, confirmation_rappel_h: 16 },
+  { entity: '3Ps',   label: '3Ps',           rappel_prestataire_h: 24, escalade_directeur_h: 48, escalade_dg_h: 72, confirmation_rappel_h: 24 },
+  { entity: 'K&Ko',  label: 'K & Ko',        rappel_prestataire_h: 24, escalade_directeur_h: 48, escalade_dg_h: 72, confirmation_rappel_h: 24 },
+];
+
+function AlertRuleRow({ rule, group, isDG, onSave }: {
+  rule: AlertRule;
+  group: AlertRule;
+  isDG: boolean;
+  onSave: (r: AlertRule) => void;
+}) {
+  const [open, setOpen]   = useState(false);
+  const [draft, setDraft] = useState(rule);
+  const [saved, setSaved] = useState(false);
+  const isGroup = rule.entity === 'groupe';
+
+  function setF<K extends keyof AlertRule>(k: K, v: number) {
+    setDraft(prev => ({ ...prev, [k]: v }));
+  }
+
+  const violations = isGroup ? [] : [
+    draft.rappel_prestataire_h > group.rappel_prestataire_h    && `Rappel prestataire (${draft.rappel_prestataire_h}h) plus laxiste que le groupe (${group.rappel_prestataire_h}h)`,
+    draft.escalade_directeur_h > group.escalade_directeur_h    && `Escalade directeur (${draft.escalade_directeur_h}h) plus laxiste que le groupe (${group.escalade_directeur_h}h)`,
+    draft.escalade_dg_h > group.escalade_dg_h                  && `Escalade DG (${draft.escalade_dg_h}h) plus laxiste que le groupe (${group.escalade_dg_h}h)`,
+    draft.confirmation_rappel_h > group.confirmation_rappel_h  && `Rappel confirmation (${draft.confirmation_rappel_h}h) plus laxiste que le groupe (${group.confirmation_rappel_h}h)`,
+  ].filter(Boolean) as string[];
+
+  function handleSave() {
+    if (violations.length > 0) return;
+    onSave(draft); setSaved(true);
+    setTimeout(() => { setSaved(false); setOpen(false); }, 1200);
+  }
+
+  const canEdit = isGroup ? isDG : true;
+
+  return (
+    <div className={`rounded-xl border overflow-hidden ${violations.length > 0 ? 'border-red-200' : 'border-slate-200'}`}>
+      <div className={`px-4 py-3 flex items-center gap-3 ${violations.length > 0 ? 'bg-red-50' : isGroup ? 'bg-slate-50' : 'bg-white'}`}>
+        <button onClick={() => canEdit && setOpen(o => !o)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+          {canEdit && (
+            <svg className={`w-3.5 h-3.5 shrink-0 transition-transform text-slate-400 ${open ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          )}
+          <div>
+            <div className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+              {rule.label}
+              {isGroup && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Référence groupe</span>}
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5">
+              Rappel {rule.rappel_prestataire_h}h · Escalade directeur {rule.escalade_directeur_h}h · Escalade DG {rule.escalade_dg_h}h · Confirmation {rule.confirmation_rappel_h}h
+            </div>
+          </div>
+        </button>
+        <div className="shrink-0">
+          {violations.length > 0
+            ? <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">⚠ {violations.length} écart{violations.length > 1 ? 's' : ''}</span>
+            : <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ OK</span>}
+        </div>
+      </div>
+
+      {open && canEdit && (
+        <div className="px-5 py-4 border-t border-slate-100 space-y-4">
+          {violations.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700 space-y-0.5">
+              {violations.map((v, i) => <div key={i}>⚠ {v}</div>)}
+            </div>
+          )}
+          {!isGroup && (
+            <p className="text-xs text-slate-400">Les règles d&apos;entité doivent être <strong>plus strictes ou égales</strong> aux règles groupe. Un délai plus court = règle plus stricte.</p>
+          )}
+
+          {[
+            { key: 'rappel_prestataire_h'  as const, label: 'Rappel prestataire (inaction)',  desc: 'Email auto au prestataire si aucune mise à jour après X heures en statut "En cours"',  max: isGroup ? 72 : group.rappel_prestataire_h },
+            { key: 'escalade_directeur_h'  as const, label: 'Escalade → Directeur d\'entité', desc: 'Si toujours bloqué X heures après rappel, email au directeur d\'entité',                 max: isGroup ? 96 : group.escalade_directeur_h },
+            { key: 'escalade_dg_h'         as const, label: 'Escalade → Direction Générale',  desc: 'Si non résolu X heures après escalade directeur, email DG',                              max: isGroup ? 168 : group.escalade_dg_h },
+            { key: 'confirmation_rappel_h' as const, label: 'Rappel confirmation demandeur',   desc: 'Email au demandeur si l\'intervention n\'est pas confirmée après X heures',              max: isGroup ? 72 : group.confirmation_rappel_h },
+          ].map(({ key, label, desc, max }) => (
+            <div key={key}>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-slate-700">{label}</label>
+                <span className="text-xs text-slate-400">{desc}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number" min={1} max={max} step={1}
+                  value={draft[key] as number}
+                  onChange={e => setF(key, Number(e.target.value))}
+                  className="w-24 text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-right focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                />
+                <span className="text-xs text-slate-500">heures{!isGroup && <span className="text-slate-300 ml-1">(max {max}h — plafond groupe)</span>}</span>
+              </div>
+            </div>
+          ))}
+
+          <div className="flex gap-2 justify-end pt-2 border-t border-slate-200">
+            <button onClick={() => { setDraft(rule); setOpen(false); }} className="text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">Annuler</button>
+            <button onClick={handleSave} disabled={violations.length > 0}
+              className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${saved ? 'bg-green-600 text-white' : violations.length > 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
+              {saved ? '✓ Enregistré' : violations.length > 0 ? 'Corriger les écarts' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AlertesTab() {
+  const [isDG] = useState(true);
+  const [rules, setRules] = useState<AlertRule[]>(INITIAL_ALERT_RULES);
+  const group = rules.find(r => r.entity === 'groupe') ?? GROUP_ALERT_DEFAULTS;
+
+  function updateRule(entity: string, updated: AlertRule) {
+    setRules(prev => prev.map(r => r.entity === entity ? updated : r));
+  }
+
+  const entityRules = rules.filter(r => r.entity !== 'groupe');
+  const entityViolations = entityRules.filter(r => {
+    return r.rappel_prestataire_h > group.rappel_prestataire_h ||
+           r.escalade_directeur_h > group.escalade_directeur_h ||
+           r.escalade_dg_h > group.escalade_dg_h ||
+           r.confirmation_rappel_h > group.confirmation_rappel_h;
+  }).length;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <div className="font-medium text-slate-900">Règles d&apos;alertes et d&apos;escalades</div>
+        <div className="text-xs text-slate-400 mt-0.5">
+          Délais déclenchant les emails automatiques de rappel et d&apos;escalade — définis par la DG, affinés par entité
+        </div>
+      </div>
+
+      {/* Légende du circuit */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-600 space-y-2">
+        <div className="font-semibold text-slate-700 mb-1">Circuit d&apos;escalade automatique</div>
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">1</span><span><strong>Rappel prestataire</strong> — email auto si aucun progrès en cours d&apos;intervention</span></div>
+          <div className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">2</span><span><strong>Escalade directeur</strong> — si toujours bloqué après le rappel, le directeur est notifié</span></div>
+          <div className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-red-100 text-red-700 flex items-center justify-center text-xs font-bold">3</span><span><strong>Escalade DG</strong> — si non résolu après escalade directeur</span></div>
+          <div className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-xs font-bold">4</span><span><strong>Rappel confirmation</strong> — email demandeur pour confirmer réception des travaux</span></div>
+        </div>
+        <div className="text-slate-400 pt-1 border-t border-slate-200 mt-1">
+          Les règles d&apos;entité doivent être <strong>plus strictes ou égales</strong> aux règles groupe. Elles ne peuvent pas être enregistrées si elles dépassent le plafond DG.
+        </div>
+      </div>
+
+      {entityViolations > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          ⚠ <strong>{entityViolations} entité{entityViolations > 1 ? 's' : ''}</strong> avec des règles plus laxistes que le groupe — correction requise
+        </div>
+      )}
+
+      {/* Règles groupe */}
+      <div>
+        <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Règles groupe — référence</div>
+        <AlertRuleRow
+          rule={group}
+          group={group}
+          isDG={isDG}
+          onSave={updated => updateRule('groupe', updated)}
+        />
+      </div>
+
+      {/* Règles par entité */}
+      <div>
+        <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Règles par entité</div>
+        <p className="text-xs text-slate-400 mb-3">Par défaut identiques aux règles groupe. Les directeurs d&apos;entité peuvent les rendre plus strictes.</p>
+        <div className="space-y-2">
+          {entityRules.map(r => (
+            <AlertRuleRow
+              key={r.entity}
+              rule={r}
+              group={group}
+              isDG={isDG}
+              onSave={updated => updateRule(r.entity, updated)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const [tab, setTab]           = useState<Tab>('sites');
@@ -1203,6 +1606,7 @@ export default function SettingsPage() {
   const [prestataires, setPrestataires] = useState<Prestataire[]>(MOCK_PRESTATAIRES);
   const [users, setUsers]       = useState<AppUser[]>(INITIAL_USERS);
   const [newLabel, setNewLabel]           = useState('');
+  const [newCity, setNewCity]             = useState('');
   const [newSiteEntity, setNewSiteEntity] = useState('LAD');
   const [newCode, setNewCode]             = useState('');
   const [newName, setNewName]             = useState('');
@@ -1213,6 +1617,7 @@ export default function SettingsPage() {
     { key: 'prestataires', label: 'Prestataires' },
     { key: 'users',       label: 'Utilisateurs' },
     { key: 'objectifs',   label: 'Objectifs KPI' },
+    { key: 'alertes',    label: 'Alertes & Escalades' },
   ];
 
   return (
@@ -1241,59 +1646,40 @@ export default function SettingsPage() {
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <div className="font-medium text-slate-900">Sites d&apos;intervention</div>
-              <div className="text-xs text-slate-400 mt-0.5">Sites physiques du groupe — classés par entité</div>
+              <div className="text-xs text-slate-400 mt-0.5">Sites physiques du groupe — entités associées par site</div>
             </div>
             <span className="text-xs text-slate-400">{sites.filter(s => s.active).length} actifs · {sites.length} total</span>
           </div>
-          {/* Groupement par entité */}
-          {ENTITY_LIST.map(ent => {
-            const entSites = sites.filter(s => s.entityCode === ent.code);
-            if (entSites.length === 0) return null;
-            return (
-              <div key={ent.code}>
-                <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">{ent.code}</span>
-                  <span className="text-xs text-slate-400">{ent.name}</span>
-                  <span className="ml-auto text-xs text-slate-400">{entSites.length} site{entSites.length > 1 ? 's' : ''}</span>
-                </div>
-                <ul>
-                  {entSites.map((s) => (
-                    <SiteRow
-                      key={s.id}
-                      site={s}
-                      onSave={(label) => setSites(prev => prev.map(x => x.id === s.id ? { ...x, label } : x))}
-                      onToggle={() => setSites(prev => prev.map(x => x.id === s.id ? { ...x, active: !x.active } : x))}
-                      onDelete={() => setSites(prev => prev.filter(x => x.id !== s.id))}
-                    />
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-          {/* Sites sans entité (ajoutés manuellement sans entité) */}
-          {sites.filter(s => !s.entityCode).length > 0 && (
-            <div>
-              <div className="px-5 py-2 bg-slate-50 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Sans entité</span>
-              </div>
-              <ul>
-                {sites.filter(s => !s.entityCode).map((s) => (
-                  <SiteRow
-                    key={s.id}
-                    site={s}
-                    onSave={(label) => setSites(prev => prev.map(x => x.id === s.id ? { ...x, label } : x))}
-                    onToggle={() => setSites(prev => prev.map(x => x.id === s.id ? { ...x, active: !x.active } : x))}
-                    onDelete={() => setSites(prev => prev.filter(x => x.id !== s.id))}
-                  />
-                ))}
-              </ul>
-            </div>
-          )}
+          <ul>
+            {sites.map((s) => (
+              <SiteCard
+                key={s.id}
+                site={s}
+                onSave={(updated) => setSites(prev => prev.map(x => x.id === s.id ? updated : x))}
+                onToggle={() => setSites(prev => prev.map(x => x.id === s.id ? { ...x, active: !x.active } : x))}
+                onDelete={() => setSites(prev => prev.filter(x => x.id !== s.id))}
+              />
+            ))}
+          </ul>
           {sites.length === 0 && (
             <div className="px-5 py-8 text-center text-sm text-slate-400">Aucun site configuré</div>
           )}
           {/* Ajouter un site */}
-          <div className="px-5 py-4 border-t border-slate-100 flex gap-2 flex-wrap">
+          <div className="px-5 py-4 border-t border-slate-100 flex gap-2 flex-wrap items-center">
+            <input
+              type="text"
+              placeholder="Libellé du site…"
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 min-w-[140px]"
+            />
+            <input
+              type="text"
+              placeholder="Ville…"
+              value={newCity}
+              onChange={e => setNewCity(e.target.value)}
+              className="w-32 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
+            />
             <select
               value={newSiteEntity}
               onChange={e => setNewSiteEntity(e.target.value)}
@@ -1301,28 +1687,20 @@ export default function SettingsPage() {
             >
               {ENTITY_LIST.map(e => <option key={e.code} value={e.code}>{e.code}</option>)}
             </select>
-            <input
-              type="text"
-              placeholder="Libellé du nouveau site…"
-              value={newLabel}
-              onChange={e => setNewLabel(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && newLabel.trim()) {
-                  const ent = ENTITY_LIST.find(x => x.code === newSiteEntity)!;
-                  setSites(prev => [...prev, { id: Date.now().toString(), label: newLabel.trim(), entityCode: ent.code, entityName: ent.name, active: true }]);
-                  setNewLabel('');
-                }
-              }}
-              className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 min-w-[160px]"
-            />
             <button
               onClick={() => {
                 if (!newLabel.trim()) return;
-                const ent = ENTITY_LIST.find(x => x.code === newSiteEntity)!;
-                setSites(prev => [...prev, { id: Date.now().toString(), label: newLabel.trim(), entityCode: ent.code, entityName: ent.name, active: true }]);
+                setSites(prev => [...prev, {
+                  id: Date.now().toString(),
+                  label: newLabel.trim(),
+                  city: newCity.trim() || '—',
+                  entityCodes: newSiteEntity ? [newSiteEntity] : [],
+                  active: true,
+                }]);
                 setNewLabel('');
+                setNewCity('');
               }}
-              className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors"
+              className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors whitespace-nowrap"
             >
               + Ajouter
             </button>
@@ -1396,6 +1774,9 @@ export default function SettingsPage() {
 
       {/* ── Objectifs KPI ────────────────────────────────────────────── */}
       {tab === 'objectifs' && <ObjectifsTab />}
+
+      {/* ── Alertes & Escalades ──────────────────────────────────────── */}
+      {tab === 'alertes' && <AlertesTab />}
     </div>
   );
 }

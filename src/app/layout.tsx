@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Facility Manager',
-  description: 'Plateforme de maintenance des différents sites au sein du Groupe Elkateb',
+  description: 'Service Maintenance des Infrastructures multi-sites du groupe Elkateb',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -16,8 +16,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${inter.className} bg-slate-50 text-slate-900 antialiased`}>
         <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-            <Link href="/" className="font-bold text-lg tracking-tight text-slate-900">
-              🏢 Facility Manager
+            <Link href="/" className="leading-tight">
+              <div className="font-bold text-lg tracking-tight text-slate-900">🏢 Facility Manager</div>
+              <div className="text-xs text-slate-400 font-normal">Service Maintenance des Infrastructures multi-sites du groupe Elkateb</div>
             </Link>
             <nav className="flex items-center gap-1 text-sm font-medium text-slate-600">
               <Link href="/demandes" className="px-3 py-1.5 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors">
@@ -36,10 +37,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       Directeur Général
                     </Link>
                     <Link href="/dashboard/directeur" className="block px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">
-                      Directeur de site
+                      Directeur d&apos;entité
                     </Link>
                     <Link href="/dashboard/electricien" className="block px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">
                       Prestataire de service
+                    </Link>
+                    <Link href="/dashboard/demandeur" className="block px-4 py-2 text-sm hover:bg-slate-50 text-slate-700">
+                      Demandeur
                     </Link>
                   </div>
                 </div>

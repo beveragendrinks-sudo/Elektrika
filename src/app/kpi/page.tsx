@@ -187,7 +187,7 @@ function BudgetBar({ allocated, spent, committed }: { allocated: number; spent: 
     <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-semibold text-slate-900">Budget annuel réparations électriques — 2026</div>
+          <div className="font-semibold text-slate-900">Budget annuel maintenance — 2026</div>
           <div className="text-xs text-slate-400 mt-0.5">Consolidé — toutes entités et tous sites</div>
         </div>
         <div className={`text-xl font-bold ${overBudget ? 'text-red-600' : 'text-slate-900'}`}>

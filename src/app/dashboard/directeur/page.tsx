@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { GROUP_NAME, getEntity } from '@/lib/entities';
+import { GROUP_NAME, getEntity, getSitesForEntity } from '@/lib/entities';
 
 // ── Chart primitives ────────────────────────────────────────────────────────
 function SparkBars({ data, inverse = false }: { data: number[]; inverse?: boolean }) {
@@ -180,7 +180,7 @@ function BarChart({
 const ENTITY_CODE = 'FAD';
 const _entityDef  = getEntity(ENTITY_CODE)!;
 const ENTITY_NAME = _entityDef.name;
-const ENTITY_SITES = _entityDef.sites; // tous les sites de l'entité
+const ENTITY_SITES = getSitesForEntity(ENTITY_CODE);
 
 const MONTHS = ['Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul'];
 
@@ -257,7 +257,7 @@ function AnnualBudgetCard() {
     <div className={`rounded-xl border p-5 space-y-4 ${overBudget ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div className="font-semibold text-slate-900">Budget annuel réparations électriques — 2026</div>
+          <div className="font-semibold text-slate-900">Budget annuel maintenance — 2026</div>
           <div className="text-xs text-slate-400 mt-0.5">
             {ENTITY_NAME} · {ENTITY_SITES.map(s => `${s.label}, ${s.city}`).join(' — ')} · Fixé par le directeur d&apos;entité
           </div>
@@ -395,7 +395,7 @@ export default function DirecteurDashboard() {
       </div>
 
       {/* Budget annuel */}
-      <SectionTitle>Budget réparations électriques</SectionTitle>
+      <SectionTitle>Budget maintenance</SectionTitle>
       <AnnualBudgetCard />
 
       {/* KPIs avec tendances */}

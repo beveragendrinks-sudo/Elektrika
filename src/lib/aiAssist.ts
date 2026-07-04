@@ -29,19 +29,22 @@ export interface AIPhotoAnalysisResult {
   raw: string; // réponse brute, pour audit
 }
 
-const ANALYSIS_SYSTEM_PROMPT = `Tu es un assistant de diagnostic électrique industriel.
-On te fournit des photos d'une panne électrique et le contexte recueilli par téléphone.
+const ANALYSIS_SYSTEM_PROMPT = `Tu es un assistant de diagnostic maintenance multi-corps d'état (électricité, plomberie, climatisation, maçonnerie, peinture, menuiserie).
+On te fournit des photos d'une anomalie et le contexte recueilli par téléphone.
 Réponds UNIQUEMENT en JSON, sans aucun texte avant ou après, avec ce format exact :
 {
   "diagnosis": "description claire et concise du problème observé",
   "suggested_materials": [{"description": "...", "estimated_quantity": 1, "unit": "pièce"}],
-  "estimated_intervention_type": 1,
+  "estimated_category": "electricite",
+  "estimated_nature": "corrective",
   "confidence": 0.75,
   "requires_external_contractor": false
 }
+Valeurs possibles pour estimated_category : electricite | plomberie | climatisation | maconnerie | peinture | menuiserie | autres
+Valeurs possibles pour estimated_nature : corrective | preventive | amelioration | travaux_neufs | conformite
 Si les photos ne permettent pas de conclure, mets confidence en dessous de 0.4 et explique
 la limite dans "diagnosis". Ne jamais inventer une référence de pièce précise que tu ne peux
-pas lire sur la photo — reste générique dans ce cas ("disjoncteur 32A type non lisible").`;
+pas lire sur la photo — reste générique dans ce cas.`;
 
 type AnthropicBlock = { type: string; text?: string; source?: { type: string; media_type: string; data: string } };
 

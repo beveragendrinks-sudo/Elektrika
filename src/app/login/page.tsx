@@ -8,9 +8,9 @@ import { useRouter } from 'next/navigation';
 const DEMO_USERS: Record<string, { password: string; role: string; label: string; dashboard: string }> = {
   'admin@elektrika.tn':   { password: 'facility2026', role: 'admin',              label: 'Administrateur',      dashboard: '/settings' },
   'dg@elektrika.tn':      { password: 'facility2026', role: 'directeur_general',  label: 'Directeur Général',   dashboard: '/dashboard/dg' },
-  'directeur@lad.tn':     { password: 'facility2026', role: 'directeur_de_site',  label: 'Directeur de site',   dashboard: '/dashboard/directeur' },
+  'directeur@lad.tn':     { password: 'facility2026', role: 'directeur_de_site',  label: "Directeur d'entité",   dashboard: '/dashboard/directeur' },
   'electricien@lad.tn':   { password: 'facility2026', role: 'electricien',        label: 'Prestataire de service',         dashboard: '/dashboard/electricien' },
-  'demandeur@lad.tn':     { password: 'facility2026', role: 'demandeur',          label: 'Demandeur',           dashboard: '/demandes' },
+  'demandeur@lad.tn':     { password: 'facility2026', role: 'demandeur',          label: 'Demandeur',           dashboard: '/dashboard/demandeur' },
 };
 
 export default function LoginPage() {
@@ -53,7 +53,7 @@ export default function LoginPage() {
       {/* Branding */}
       <div className="mb-8 text-center relative z-10">
         <div className="text-4xl font-black text-white tracking-tight">🏢 Facility Manager</div>
-        <div className="text-slate-400 text-sm mt-1.5">Maintenance Électrique Industrielle · Multi-sites &amp; Multi-entités</div>
+        <div className="text-slate-400 text-sm mt-1.5">Service Maintenance des Infrastructures multi-sites du groupe Elkateb</div>
       </div>
 
       {/* Card */}
@@ -170,7 +170,7 @@ export default function LoginPage() {
       </div>
 
       <div className="mt-6 text-slate-600 text-xs text-center relative z-10">
-        © 2026 Facility Manager · Groupe Elkateb — Maintenance multi-sites
+        © 2026 Facility Manager · Service Maintenance des Infrastructures multi-sites du groupe Elkateb
       </div>
     </div>
   );

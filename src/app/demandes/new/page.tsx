@@ -6,7 +6,7 @@ import { getAllSites } from '@/lib/entities';
 // Générés depuis ENTITY_LIST : chaque entité → ses sites, avec contexte entité dans le label
 const FALLBACK_SITES = getAllSites().map(s => ({
   intervention_site_id: s.id,
-  label: `${s.label}, ${s.city} (${s.entityCode})`,
+  label: `${s.label}, ${s.city}${s.entityCodes.length ? ' (' + s.entityCodes.join(', ') + ')' : ''}`,
 }));
 
 const FALLBACK_ENTITIES = [

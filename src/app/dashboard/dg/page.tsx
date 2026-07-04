@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { computeOEI } from '@/lib/kpiEngine';
-import { GROUP_NAME, ENTITY_LIST } from '@/lib/entities';
+import { GROUP_NAME, ENTITY_LIST, getSitesForEntity } from '@/lib/entities';
 
 type EntityFilter = 'all' | 'LAD' | 'FAD' | 'BTFI' | '3Ps' | 'K&Ko';
 
@@ -237,7 +237,7 @@ export default function DGDashboard() {
             : (() => {
               const e = ENTITY_LIST.find(x => x.code === filter);
               if (!e) return filter;
-              const sites = e.sites.map(s => `${s.label}, ${s.city}`).join(' · ');
+              const sites = getSitesForEntity(e.code).map(s => `${s.label}, ${s.city}`).join(' · ');
               return `Entité ${e.code} — ${e.name} · ${sites}`;
             })()
           }
@@ -291,8 +291,8 @@ export default function DGDashboard() {
             className={`text-left px-3 py-2 rounded-lg border transition-all ${filter === e.code ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-200 text-slate-600 hover:border-slate-400'}`}>
             <div className="text-sm font-semibold leading-tight">{e.code}</div>
             <div className={`text-xs leading-tight ${filter === e.code ? 'text-slate-400' : 'text-slate-400'}`}>
-              {e.sites[0].label}, {e.sites[0].city}
-              {e.sites.length > 1 && <span className="ml-1 opacity-60">+{e.sites.length - 1}</span>}
+              {(() => { const ss = getSitesForEntity(e.code); return ss.length ? `${ss[0].label}, ${ss[0].city}` : '—'; })()}
+              {getSitesForEntity(e.code).length > 1 && <span className="ml-1 opacity-60">+{getSitesForEntity(e.code).length - 1}</span>}
             </div>
           </button>
         ))}
@@ -348,7 +348,7 @@ export default function DGDashboard() {
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-semibold text-slate-900">Budget réparations électriques 2026 — {filter === 'all' ? 'Groupe' : filter}</div>
+            <div className="font-semibold text-slate-900">Budget maintenance 2026 — {filter === 'all' ? 'Groupe' : filter}</div>
             <div className="text-xs text-slate-400 mt-0.5">Alloué par les directeurs d&apos;entité · Suivi BCs</div>
           </div>
           <div className={`text-lg font-bold ${budgetColor(totalSpent, totalCommitted, totalBudget)}`}>
@@ -417,8 +417,8 @@ export default function DGDashboard() {
                       <>
                         <div className="font-semibold text-slate-900">{e.code} <span className="font-normal text-slate-500 text-xs">{def?.name}</span></div>
                         <div className="text-xs text-slate-400">
-                          {def?.sites[0].label}, {def?.sites[0].city}
-                          {def && def.sites.length > 1 && <span className="ml-1 text-slate-300">· +{def.sites.length - 1} site{def.sites.length > 2 ? 's' : ''}</span>}
+                          {(() => { const ss = getSitesForEntity(e.code); return ss.length ? `${ss[0].label}, ${ss[0].city}` : '—'; })()}
+                          {(() => { const n = getSitesForEntity(e.code).length; return n > 1 ? <span className="ml-1 text-slate-300">· +{n - 1} site{n > 2 ? 's' : ''}</span> : null; })()}
                         </div>
                       </>
                     ); })()}
