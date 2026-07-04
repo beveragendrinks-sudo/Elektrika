@@ -280,7 +280,7 @@ CREATE TABLE maintenance_requests (
   estimated_minutes INT,
   required_skill_id UUID REFERENCES skills(skill_id),
   submitted_at TIMESTAMPTZ,        -- sortie de 'draft'
-  planned_mission_id UUID,
+  planned_mission_id UUID REFERENCES missions(mission_id) ON DELETE SET NULL,
   started_at TIMESTAMPTZ,          -- entrée 'in_progress'
   completed_at TIMESTAMPTZ,        -- entrée 'completed_pending_confirmation'
   closed_at TIMESTAMPTZ,           -- entrée 'accepted' (terminal)
