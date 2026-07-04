@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import { ENTITY_LIST, getAllSites, entitySitesLabel, getEntitiesForSite } from '@/lib/entities';
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Tab = 'sites' | 'entities' | 'prestataires' | 'users' | 'objectifs' | 'alertes';
+type Tab = 'sites' | 'entities' | 'prestataires' | 'fournisseurs' | 'users' | 'objectifs' | 'alertes';
 
 type UserRoleType = 'admin' | 'directeur_general' | 'directeur_de_site' | 'electricien' | 'demandeur';
 
@@ -149,6 +149,49 @@ const MOCK_PRESTATAIRES: Prestataire[] = [
   { id: '1', name: 'Mohamed Salah', site: 'Siège, Ben Arous (LAD)',            categories: ['electricite', 'autres'],               email: 'msalah@lad.tn',    whatsapp: '+216 50 123 456', active: true },
   { id: '2', name: 'Karim Bejaoui', site: 'Pôle Industriel, Jbel Oust (FAD)', categories: ['plomberie', 'climatisation'],          email: 'kbejaoui@fad.tn',  whatsapp: '+216 55 234 567', active: true },
   { id: '3', name: 'Anis Trabelsi', site: 'Site Principal, Megrine (3Ps)',      categories: ['maconnerie', 'peinture', 'menuiserie'], email: 'atrabelsi@3ps.tn', whatsapp: '+216 52 345 678', active: true },
+];
+
+interface Fournisseur {
+  id: string;
+  company: string;        // raison sociale
+  contact: string;        // nom et prénom du contact
+  email: string;
+  whatsapp: string;
+  address: string;
+  matricule_fiscale: string;
+  categories: string[];   // catégories de matériel fourni
+  active: boolean;
+}
+
+const MOCK_FOURNISSEURS: Fournisseur[] = [
+  {
+    id: 'f1', company: 'Elkateb Matériaux Électriques', contact: 'Sami Elkateb',
+    email: 'sami@elkateb-elec.tn', whatsapp: '+216 71 100 200',
+    address: 'Zone Industrielle Charguia II, 2035 Ariana',
+    matricule_fiscale: '1001234/A/M/000',
+    categories: ['electricite', 'autres'], active: true,
+  },
+  {
+    id: 'f2', company: 'TunisPlomb SARL', contact: 'Khaled Meddeb',
+    email: 'k.meddeb@tunisplomb.tn', whatsapp: '+216 55 300 400',
+    address: 'Rue de l\'Industrie, 2013 Ben Arous',
+    matricule_fiscale: '1002345/B/P/000',
+    categories: ['plomberie'], active: true,
+  },
+  {
+    id: 'f3', company: 'ClimaTech Tunisie', contact: 'Nour Gharbi',
+    email: 'nour@climatech.tn', whatsapp: '+216 52 400 500',
+    address: 'Avenue Habib Bourguiba, 2080 Ariana',
+    matricule_fiscale: '1003456/C/N/000',
+    categories: ['climatisation'], active: true,
+  },
+  {
+    id: 'f4', company: 'Bâti Pro Tunisie', contact: 'Riadh Boussema',
+    email: 'rboussema@batipro.tn', whatsapp: '+216 50 500 600',
+    address: 'Route de Grombalia, 8070 Grombalia',
+    matricule_fiscale: '1004567/D/M/000',
+    categories: ['maconnerie', 'peinture', 'menuiserie'], active: true,
+  },
 ];
 
 const INITIAL_USERS: AppUser[] = [
@@ -1390,6 +1433,229 @@ function PrestatairesTab({
   );
 }
 
+// ── Add fournisseur form ───────────────────────────────────────────────────
+function AddFournisseurForm({ onAdd }: { onAdd: (f: Fournisseur) => void }) {
+  const empty: Omit<Fournisseur, 'id'> = {
+    company: '', contact: '', email: '', whatsapp: '', address: '', matricule_fiscale: '', categories: [], active: true,
+  };
+  const [open, setOpen]   = useState(false);
+  const [form, setForm]   = useState(empty);
+  const [saved, setSaved] = useState(false);
+
+  function setF<K extends keyof typeof empty>(k: K, v: (typeof empty)[K]) {
+    setForm(prev => ({ ...prev, [k]: v }));
+  }
+  function toggleCat(key: string) {
+    setForm(prev => ({
+      ...prev,
+      categories: prev.categories.includes(key)
+        ? prev.categories.filter(k => k !== key)
+        : [...prev.categories, key],
+    }));
+  }
+  function handleAdd() {
+    if (!form.company.trim()) return;
+    onAdd({ ...form, id: Date.now().toString(), company: form.company.trim(), contact: form.contact.trim() });
+    setSaved(true);
+    setTimeout(() => { setSaved(false); setOpen(false); setForm(empty); }, 1200);
+  }
+
+  if (!open) {
+    return (
+      <div className="px-5 py-3 border-t border-slate-100">
+        <button onClick={() => setOpen(true)}
+          className="text-sm text-slate-600 hover:text-slate-900 font-medium hover:bg-slate-50 px-3 py-1.5 rounded-lg transition-colors">
+          + Ajouter un fournisseur
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 space-y-3">
+      <div className="font-medium text-sm text-slate-700">Nouveau fournisseur</div>
+      <div className="grid grid-cols-2 gap-2">
+        <input type="text" value={form.company} onChange={e => setF('company', e.target.value)}
+          placeholder="Raison sociale *"
+          className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white col-span-2" />
+        <input type="text" value={form.contact} onChange={e => setF('contact', e.target.value)}
+          placeholder="Nom et prénom — contact"
+          className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+        <input type="text" value={form.matricule_fiscale} onChange={e => setF('matricule_fiscale', e.target.value)}
+          placeholder="Matricule fiscale"
+          className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white font-mono" />
+        <input type="email" value={form.email} onChange={e => setF('email', e.target.value)}
+          placeholder="Email"
+          className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+        <input type="tel" value={form.whatsapp} onChange={e => setF('whatsapp', e.target.value)}
+          placeholder="WhatsApp (+216…)"
+          className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+        <input type="text" value={form.address} onChange={e => setF('address', e.target.value)}
+          placeholder="Adresse complète"
+          className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white col-span-2" />
+      </div>
+      <div className="border border-slate-200 rounded-lg p-3 bg-white">
+        <div className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Catégories de matériel fourni</div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {ALL_CATEGORY_KEYS.map(key => {
+            const c = CATEGORY_LABELS[key];
+            const checked = form.categories.includes(key);
+            return (
+              <label key={key} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs transition-colors ${checked ? 'bg-slate-900 text-white' : 'hover:bg-slate-50 text-slate-700 border border-slate-100'}`}>
+                <input type="checkbox" checked={checked} onChange={() => toggleCat(key)} className="hidden" />
+                <span>{c.icon}</span>
+                <span className="font-medium">{c.label}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button onClick={() => { setOpen(false); setForm(empty); }}
+          className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">Annuler</button>
+        <button onClick={handleAdd} disabled={!form.company.trim()}
+          className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 ${saved ? 'bg-green-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
+          {saved ? '✓ Ajouté' : '+ Ajouter'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Fournisseur row (inline edit + toggle + delete) ───────────────────────
+function FournisseurRow({ f, onSave, onToggle, onDelete }: {
+  f: Fournisseur;
+  onSave: (updated: Fournisseur) => void;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing]       = useState(false);
+  const [draft, setDraft]           = useState<Fournisseur>(f);
+  const [saved, setSaved]           = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  function handleSave() {
+    if (!draft.company.trim()) return;
+    onSave({ ...draft, company: draft.company.trim(), contact: draft.contact.trim() });
+    setSaved(true);
+    setTimeout(() => { setSaved(false); setEditing(false); }, 1200);
+  }
+
+  function toggleCat(key: string) {
+    setDraft(prev => ({
+      ...prev,
+      categories: prev.categories.includes(key)
+        ? prev.categories.filter(k => k !== key)
+        : [...prev.categories, key],
+    }));
+  }
+
+  if (editing) {
+    return (
+      <li className="px-5 py-4 bg-slate-50 border-b border-slate-100 last:border-0">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <input type="text" value={draft.company} onChange={e => setDraft(d => ({ ...d, company: e.target.value }))}
+              placeholder="Raison sociale *"
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white col-span-2" />
+            <input type="text" value={draft.contact} onChange={e => setDraft(d => ({ ...d, contact: e.target.value }))}
+              placeholder="Nom et prénom — contact"
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+            <input type="text" value={draft.matricule_fiscale} onChange={e => setDraft(d => ({ ...d, matricule_fiscale: e.target.value }))}
+              placeholder="Matricule fiscale"
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white font-mono" />
+            <input type="email" value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))}
+              placeholder="Email"
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+            <input type="tel" value={draft.whatsapp} onChange={e => setDraft(d => ({ ...d, whatsapp: e.target.value }))}
+              placeholder="WhatsApp (+216…)"
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white" />
+            <input type="text" value={draft.address} onChange={e => setDraft(d => ({ ...d, address: e.target.value }))}
+              placeholder="Adresse"
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white col-span-2" />
+          </div>
+          <div className="border border-slate-200 rounded-lg p-3 bg-white">
+            <div className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Catégories de matériel fourni</div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {ALL_CATEGORY_KEYS.map(key => {
+                const c = CATEGORY_LABELS[key];
+                const checked = draft.categories.includes(key);
+                return (
+                  <label key={key} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs transition-colors ${checked ? 'bg-slate-900 text-white' : 'hover:bg-slate-50 text-slate-700 border border-slate-100'}`}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleCat(key)} className="hidden" />
+                    <span>{c.icon}</span>
+                    <span className="font-medium">{c.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => { setDraft(f); setEditing(false); }}
+              className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">Annuler</button>
+            <button onClick={handleSave} disabled={!draft.company.trim()}
+              className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 ${saved ? 'bg-green-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
+              {saved ? '✓ Enregistré' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <li className="px-5 py-4 group border-b border-slate-100 last:border-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-sm font-semibold ${f.active ? 'text-slate-900' : 'text-slate-400 line-through'}`}>{f.company}</span>
+            {f.contact && <span className="text-xs text-slate-500">— {f.contact}</span>}
+          </div>
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {f.categories.map(cat => {
+              const c = CATEGORY_LABELS[cat];
+              return c ? (
+                <span key={cat} className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
+                  {c.icon} {c.label}
+                </span>
+              ) : null;
+            })}
+            {f.categories.length === 0 && <span className="text-xs text-slate-300 italic">Aucune catégorie</span>}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-xs text-slate-400">
+            {f.email && <span>✉ {f.email}</span>}
+            {f.whatsapp && <span>📱 {f.whatsapp}</span>}
+            {f.address && <span>📍 {f.address}</span>}
+            {f.matricule_fiscale && <span className="font-mono bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{f.matricule_fiscale}</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {confirmDel ? (
+            <>
+              <span className="text-xs text-red-600 mr-1">Supprimer ?</span>
+              <button onClick={onDelete} className="text-xs bg-red-600 text-white px-2 py-1 rounded-lg hover:bg-red-700">Oui</button>
+              <button onClick={() => setConfirmDel(false)} className="text-xs border border-slate-200 px-2 py-1 rounded-lg hover:bg-slate-50">Non</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { setDraft(f); setEditing(true); }}
+                className="opacity-0 group-hover:opacity-100 text-xs text-slate-500 hover:text-slate-900 px-2 py-1 rounded-lg hover:bg-slate-100 transition-all">
+                Modifier
+              </button>
+              <button onClick={onToggle}
+                className={`text-xs px-2 py-1 rounded-lg border transition-colors ${f.active ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
+                {f.active ? 'Désactiver' : 'Activer'}
+              </button>
+              <button onClick={() => setConfirmDel(true)}
+                className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 px-1 py-1 rounded transition-all">✕</button>
+            </>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
 // ── Alertes & Escalades tab ────────────────────────────────────────────────
 interface AlertRule {
   entity: string; // 'groupe' | entity code
@@ -1604,6 +1870,7 @@ export default function SettingsPage() {
   const [sites, setSites]       = useState(MOCK_SITES);
   const [entities, setEntities] = useState<EntityDetail[]>(MOCK_ENTITIES);
   const [prestataires, setPrestataires] = useState<Prestataire[]>(MOCK_PRESTATAIRES);
+  const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(MOCK_FOURNISSEURS);
   const [users, setUsers]       = useState<AppUser[]>(INITIAL_USERS);
   const [newLabel, setNewLabel]           = useState('');
   const [newCity, setNewCity]             = useState('');
@@ -1615,6 +1882,7 @@ export default function SettingsPage() {
     { key: 'sites',       label: "Sites d'intervention" },
     { key: 'entities',    label: 'Entités' },
     { key: 'prestataires', label: 'Prestataires' },
+    { key: 'fournisseurs', label: 'Fournisseurs BC' },
     { key: 'users',       label: 'Utilisateurs' },
     { key: 'objectifs',   label: 'Objectifs KPI' },
     { key: 'alertes',    label: 'Alertes & Escalades' },
@@ -1769,6 +2037,35 @@ export default function SettingsPage() {
             ))}
           </ul>
           <AddUserForm sites={sites} onAdd={(u) => setUsers(prev => [...prev, u])} />
+        </div>
+      )}
+
+      {/* ── Fournisseurs BC ──────────────────────────────────────────── */}
+      {tab === 'fournisseurs' && (
+        <div className="bg-white rounded-xl border border-slate-200">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <div className="font-medium text-slate-900">Fournisseurs de matériel — Bons de Commande</div>
+              <div className="text-xs text-slate-400 mt-0.5">Fournisseurs agréés pour l&apos;approvisionnement en matériel de maintenance</div>
+            </div>
+            <span className="text-xs text-slate-400">{fournisseurs.filter(f => f.active).length} actifs · {fournisseurs.length} total</span>
+          </div>
+          <ul>
+            {fournisseurs.map(f => (
+              <FournisseurRow
+                key={f.id}
+                f={f}
+                onSave={updated => setFournisseurs(prev => prev.map(x => x.id === f.id ? updated : x))}
+                onToggle={() => setFournisseurs(prev => prev.map(x => x.id === f.id ? { ...x, active: !x.active } : x))}
+                onDelete={() => setFournisseurs(prev => prev.filter(x => x.id !== f.id))}
+              />
+            ))}
+            {fournisseurs.length === 0 && (
+              <li className="px-5 py-8 text-center text-sm text-slate-400">Aucun fournisseur configuré</li>
+            )}
+          </ul>
+          {/* Ajouter un fournisseur */}
+          <AddFournisseurForm onAdd={f => setFournisseurs(prev => [...prev, f])} />
         </div>
       )}
 
