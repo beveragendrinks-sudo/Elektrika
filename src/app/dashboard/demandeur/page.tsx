@@ -71,9 +71,10 @@ interface Demande {
   nature: InterventionNature;
   site: string;
   status: RequestStatus;
-  prestataire: string;
-  prestataireAvgRating: number | null; // avg rating across all interventions
-  myRating: number | null;             // rating I gave for this intervention
+  prestataire: string;                  // nom du prestataire de service (intervenant)
+  prestataireAvgRating: number | null;  // note moyenne du prestataire
+  myRating: number | null;              // ma note pour cette intervention
+  fournisseurBC?: string;               // fournisseur matériel si BC rattaché
   createdAt: string;
   updatedAt: string;
   daysElapsed: number;
@@ -86,7 +87,8 @@ const MOCK_DEMANDES: Demande[] = [
     id: 'd1', ref: 'DEM-2026-041', title: 'Panne disjoncteur local technique RDC',
     category: 'electricite', nature: 'corrective',
     site: 'Siège, Ben Arous', status: 'in_progress',
-    prestataire: 'Elkateb Électricité', prestataireAvgRating: 4.2, myRating: null,
+    prestataire: 'Mohamed Salah', prestataireAvgRating: 4.2, myRating: null,
+    fournisseurBC: 'Elkateb Matériaux Électriques',
     createdAt: '2026-06-28', updatedAt: '2026-07-01', daysElapsed: 3,
     alertMessage: 'En cours depuis 3 jours — délai habituel dépassé (2 j)',
   },
@@ -94,35 +96,39 @@ const MOCK_DEMANDES: Demande[] = [
     id: 'd2', ref: 'DEM-2026-039', title: 'Fuite canalisation bureau direction',
     category: 'plomberie', nature: 'corrective',
     site: 'Siège, Ben Arous', status: 'planned',
-    prestataire: 'TunisPlumo SARL', prestataireAvgRating: 3.8, myRating: null,
+    prestataire: 'Karim Bejaoui', prestataireAvgRating: 3.8, myRating: null,
+    fournisseurBC: 'TunisPlomb SARL',
     createdAt: '2026-06-30', updatedAt: '2026-07-02', daysElapsed: 4,
   },
   {
     id: 'd3', ref: 'DEM-2026-035', title: 'Climatiseur salle de réunion H4',
     category: 'climatisation', nature: 'preventive',
     site: 'Siège, Ben Arous', status: 'completed_pending_confirmation',
-    prestataire: 'ClimaPro Tunisie', prestataireAvgRating: 4.7, myRating: null,
+    prestataire: 'Anis Trabelsi', prestataireAvgRating: 4.7, myRating: null,
+    fournisseurBC: 'ClimaTech Tunisie',
     createdAt: '2026-06-20', updatedAt: '2026-07-02', daysElapsed: 12,
   },
   {
     id: 'd4', ref: 'DEM-2026-028', title: 'Peinture couloir niveau 2',
     category: 'peinture', nature: 'amelioration',
     site: 'Siège, Ben Arous', status: 'accepted',
-    prestataire: 'Décor & Bâti', prestataireAvgRating: 4.0, myRating: 4,
+    prestataire: 'Anis Trabelsi', prestataireAvgRating: 4.0, myRating: 4,
     createdAt: '2026-06-10', updatedAt: '2026-06-25', daysElapsed: 15,
   },
   {
     id: 'd5', ref: 'DEM-2026-021', title: 'Installation tableau électrique annexe',
     category: 'electricite', nature: 'travaux_neufs',
     site: 'Unité Production, La Manouba', status: 'accepted',
-    prestataire: 'Elkateb Électricité', prestataireAvgRating: 4.2, myRating: 5,
+    prestataire: 'Mohamed Salah', prestataireAvgRating: 4.2, myRating: 5,
+    fournisseurBC: 'Elkateb Matériaux Électriques',
     createdAt: '2026-05-28', updatedAt: '2026-06-18', daysElapsed: 21,
   },
   {
     id: 'd6', ref: 'DEM-2026-015', title: 'Réparation porte coupe-feu',
     category: 'menuiserie', nature: 'conformite',
     site: 'Siège, Ben Arous', status: 'accepted',
-    prestataire: 'MenuisBTP', prestataireAvgRating: 3.5, myRating: 3,
+    prestataire: 'Anis Trabelsi', prestataireAvgRating: 3.5, myRating: 3,
+    fournisseurBC: 'Bâti Pro Tunisie',
     createdAt: '2026-05-10', updatedAt: '2026-05-28', daysElapsed: 18,
   },
 ];
@@ -217,49 +223,62 @@ function DemandeRow({
         </div>
       </div>
 
-      {/* Right: prestataire + rating + date */}
-      <div className="flex flex-col items-start sm:items-end gap-1 shrink-0">
-        <div className="flex items-center gap-1.5">
-          {demande.prestataireAvgRating !== null && (
-            <StarRating value={Math.round(demande.prestataireAvgRating)} readonly size="xs" />
-          )}
-          <span className="text-xs text-slate-600 font-medium">{demande.prestataire}</span>
-        </div>
-        {demande.prestataireAvgRating !== null && (
-          <span className="text-xs text-slate-400">{demande.prestataireAvgRating.toFixed(1)} / 5</span>
-        )}
-        <span className="text-xs text-slate-400">
-          Créée le {new Date(demande.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-        </span>
+      {/* Right: prestataire (1er) + fournisseur BC (2ème) + date */}
+      <div className="flex flex-col items-start sm:items-end gap-1.5 shrink-0 min-w-[160px]">
 
-        {/* Rating section */}
+        {/* Prestataire de service — primaire */}
+        <div className="flex flex-col items-start sm:items-end gap-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">Prestataire</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {demande.prestataireAvgRating !== null && (
+              <StarRating value={Math.round(demande.prestataireAvgRating)} readonly size="xs" />
+            )}
+            <span className="text-sm text-slate-900 font-semibold">{demande.prestataire}</span>
+          </div>
+          {demande.prestataireAvgRating !== null && (
+            <span className="text-xs text-slate-400">{demande.prestataireAvgRating.toFixed(1)} / 5</span>
+          )}
+        </div>
+
+        {/* Évaluation prestataire */}
         {canRate && !showRating && (
           <button
             onClick={() => setShowRating(true)}
-            className="text-xs text-teal-600 hover:text-teal-800 font-medium underline underline-offset-2 mt-0.5"
+            className="text-xs text-teal-600 hover:text-teal-800 font-medium underline underline-offset-2"
           >
-            Évaluer l&apos;intervention
+            Évaluer le prestataire
           </button>
         )}
         {canRate && showRating && (
-          <div className="flex flex-col items-end gap-1 mt-0.5 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+          <div className="flex flex-col items-end gap-1 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
             <span className="text-xs text-teal-800 font-medium">Votre note (anonyme)</span>
             <StarRating
               value={null}
               size="md"
-              onChange={(v) => {
-                onRate?.(demande.id, v);
-                setShowRating(false);
-              }}
+              onChange={(v) => { onRate?.(demande.id, v); setShowRating(false); }}
             />
           </div>
         )}
         {demande.myRating !== null && (
-          <div className="flex items-center gap-1 mt-0.5">
+          <div className="flex items-center gap-1">
             <StarRating value={demande.myRating} readonly size="xs" />
             <span className="text-xs text-slate-400">Ma note</span>
           </div>
         )}
+
+        {/* Fournisseur BC — secondaire */}
+        {demande.fournisseurBC && (
+          <div className="flex flex-col items-start sm:items-end gap-0.5 pt-1.5 border-t border-slate-100 w-full">
+            <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">BC adressé à</span>
+            <span className="text-xs text-slate-600">🏭 {demande.fournisseurBC}</span>
+          </div>
+        )}
+
+        <span className="text-xs text-slate-400 pt-0.5">
+          Créée le {new Date(demande.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+        </span>
       </div>
     </li>
   );
