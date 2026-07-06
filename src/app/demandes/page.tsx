@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { RequestStatus, InterventionCategory } from '@/types';
 import Link from 'next/link';
 import FilterBar from '@/components/FilterBar';
@@ -46,6 +46,7 @@ const STATUS_COLOR: Record<RequestStatus, string> = {
   accepted: 'bg-green-100 text-green-700',
 };
 
+// ── All demandes — IDs 1–5, 8–9 are assigned to the electricien prestataire ──
 const MOCK_DEMANDES: DemandeSummary[] = [
   {
     request_id: '1',
@@ -60,28 +61,51 @@ const MOCK_DEMANDES: DemandeSummary[] = [
   },
   {
     request_id: '2',
-    title: 'Remplacement moteur pompe circuit refroidissement',
-    status: 'preparation',
-    site_name: 'Pôle Industriel, Jbel Oust',
-    equipment_name: 'Pompe P-12',
-    submitted_at: new Date(Date.now() - 28 * 3600 * 1000).toISOString(),
-    priority_score: 55,
-    category: 'plomberie',
-    intervention_type: 2,
+    title: 'Remplacement fusible armoire B3',
+    status: 'in_progress',
+    site_name: 'Siège, Ben Arous',
+    equipment_name: 'Armoire B3',
+    submitted_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
+    priority_score: 68,
+    category: 'electricite',
+    intervention_type: 1,
   },
   {
     request_id: '3',
-    title: 'Maintenance préventive armoire électrique P2',
-    status: 'planned',
-    site_name: 'Atelier Technique, Grombalia',
-    equipment_name: 'Armoire P2',
-    submitted_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    priority_score: 30,
+    title: 'Câblage armoire AT-04',
+    status: 'completed_pending_confirmation',
+    site_name: 'Siège, Ben Arous',
+    equipment_name: 'Armoire AT-04',
+    submitted_at: new Date(Date.now() - 52 * 3600 * 1000).toISOString(),
+    priority_score: 45,
     category: 'electricite',
     intervention_type: 3,
   },
   {
     request_id: '4',
+    title: 'Disjoncteur Atelier C — remplacement',
+    status: 'planned',
+    site_name: 'Pôle Industriel, Jbel Oust',
+    equipment_name: 'Disjoncteur C3',
+    submitted_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+    priority_score: 50,
+    category: 'electricite',
+    intervention_type: 1,
+  },
+  {
+    request_id: '5',
+    title: 'Remplacement variateur fréquence V-08',
+    status: 'preparation',
+    site_name: 'Megrine',
+    equipment_name: 'Variateur V-08',
+    submitted_at: new Date(Date.now() - 18 * 3600 * 1000).toISOString(),
+    priority_score: 60,
+    category: 'electricite',
+    intervention_type: 2,
+  },
+  // ── Non-electrical demandes — visible to managers, not assigned to electricien ──
+  {
+    request_id: '6',
     title: 'Fuite canalisation atelier C — eau froide',
     status: 'in_progress',
     site_name: 'Pôle Industriel, Jbel Oust',
@@ -92,7 +116,7 @@ const MOCK_DEMANDES: DemandeSummary[] = [
     intervention_type: 1,
   },
   {
-    request_id: '5',
+    request_id: '7',
     title: 'Climatiseur salle serveurs hors service',
     status: 'ready_to_plan',
     site_name: 'Siège, Ben Arous',
@@ -103,7 +127,29 @@ const MOCK_DEMANDES: DemandeSummary[] = [
     intervention_type: 2,
   },
   {
-    request_id: '6',
+    request_id: '8',
+    title: 'Vérification tableau BT — atelier Jbel Oust',
+    status: 'in_progress',
+    site_name: 'Pôle Industriel, Jbel Oust',
+    equipment_name: 'Tableau BT',
+    submitted_at: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
+    priority_score: 55,
+    category: 'electricite',
+    intervention_type: 2,
+  },
+  {
+    request_id: '9',
+    title: 'Remplacement pompe hydraulique P-12',
+    status: 'awaiting_materials',
+    site_name: 'Pôle Industriel, Jbel Oust',
+    equipment_name: 'Pompe P-12',
+    submitted_at: new Date(Date.now() - 60 * 3600 * 1000).toISOString(),
+    priority_score: 65,
+    category: 'electricite',
+    intervention_type: 2,
+  },
+  {
+    request_id: '10',
     title: 'Fissures mur porteur entrepôt Est',
     status: 'pending_management_validation',
     site_name: 'Entrepôt Est, Grombalia',
@@ -114,7 +160,18 @@ const MOCK_DEMANDES: DemandeSummary[] = [
     intervention_type: 3,
   },
   {
-    request_id: '7',
+    request_id: '11',
+    title: 'Maintenance préventive armoire P2',
+    status: 'ready_to_plan',
+    site_name: 'Pôle Industriel, Jbel Oust',
+    equipment_name: 'Armoire P2',
+    submitted_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
+    priority_score: 30,
+    category: 'electricite',
+    intervention_type: 3,
+  },
+  {
+    request_id: '12',
     title: 'Peinture couloir administratif — bâtiment A',
     status: 'preparation',
     site_name: 'Siège, Ben Arous',
@@ -124,40 +181,15 @@ const MOCK_DEMANDES: DemandeSummary[] = [
     category: 'peinture',
     intervention_type: 3,
   },
-  {
-    request_id: '8',
-    title: 'Remplacement fenêtre cassée bureau 12',
-    status: 'draft',
-    site_name: 'Siège, Ben Arous',
-    equipment_name: 'Fenêtre bureau 12',
-    submitted_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    priority_score: 25,
-    category: 'menuiserie',
-    intervention_type: 1,
-  },
-  {
-    request_id: '9',
-    title: 'Remplacement variateur fréquence V-08',
-    status: 'awaiting_materials',
-    site_name: 'Megrine',
-    equipment_name: 'Variateur V-08',
-    submitted_at: new Date(Date.now() - 60 * 3600 * 1000).toISOString(),
-    priority_score: 65,
-    category: 'electricite',
-    intervention_type: 2,
-  },
-  {
-    request_id: '10',
-    title: 'Installation VMC salle de réunion principale',
-    status: 'accepted',
-    site_name: 'Siège, Ben Arous',
-    equipment_name: 'VMC salle 1',
-    submitted_at: new Date(Date.now() - 120 * 3600 * 1000).toISOString(),
-    priority_score: 20,
-    category: 'climatisation',
-    intervention_type: 3,
-  },
 ];
+
+// ── Prestataire profiles — which demandes are assigned + allowed categories ──
+const PRESTATAIRE_PROFILES: Record<string, { assignedIds: string[]; categories: InterventionCategory[] }> = {
+  electricien: {
+    assignedIds: ['1', '2', '3', '4', '5', '8', '9', '11'],
+    categories: ['electricite'],
+  },
+};
 
 function timeAgo(iso: string): string {
   const hours = (Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60);
@@ -169,8 +201,27 @@ function timeAgo(iso: string): string {
 export default function DemandesPage() {
   const [selectedCategories, setSelectedCategories] = useState<ActiveCategories>([]);
   const [selectedTypes, setSelectedTypes] = useState<ActiveTypes>([]);
+  const [prestataireProfile, setPrestataireProfile] = useState<typeof PRESTATAIRE_PROFILES[string] | null>(null);
 
-  const filtered = MOCK_DEMANDES.filter(d => {
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('fm_session');
+      if (raw) {
+        const session = JSON.parse(raw);
+        const profile = PRESTATAIRE_PROFILES[session.role];
+        if (profile) setPrestataireProfile(profile);
+      }
+    } catch { /* localStorage unavailable */ }
+  }, []);
+
+  // Restrict to assigned demandes for prestataires
+  const baseDemandes = prestataireProfile
+    ? MOCK_DEMANDES.filter(d => prestataireProfile.assignedIds.includes(d.request_id))
+    : MOCK_DEMANDES;
+
+  const allowedCategories = prestataireProfile?.categories;
+
+  const filtered = baseDemandes.filter(d => {
     const catOk = selectedCategories.length === 0 || selectedCategories.includes(d.category);
     const typeOk = selectedTypes.length === 0 || selectedTypes.includes(d.intervention_type);
     return catOk && typeOk;
@@ -182,9 +233,9 @@ export default function DemandesPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Demandes de maintenance</h1>
           <p className="text-slate-500 mt-1">
-            {filtered.length !== MOCK_DEMANDES.length
-              ? <><span className="font-medium">{filtered.length}</span> / {MOCK_DEMANDES.length} demandes</>
-              : <>{MOCK_DEMANDES.length} demandes actives</>
+            {filtered.length !== baseDemandes.length
+              ? <><span className="font-medium">{filtered.length}</span> / {baseDemandes.length} demandes</>
+              : <>{baseDemandes.length} demande{baseDemandes.length > 1 ? 's' : ''}{prestataireProfile ? ' assignées' : ' actives'}</>
             }
           </p>
         </div>
@@ -199,7 +250,8 @@ export default function DemandesPage() {
         onCategoriesChange={setSelectedCategories}
         onTypesChange={setSelectedTypes}
         resultCount={filtered.length}
-        totalCount={MOCK_DEMANDES.length}
+        totalCount={baseDemandes.length}
+        allowedCategories={allowedCategories}
       />
 
       <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100">

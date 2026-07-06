@@ -90,6 +90,9 @@ const WEEK_PLAN: WeekDay[] = [
   },
 ];
 
+// Categories this prestataire is qualified to handle
+const ALLOWED_CATEGORIES: InterventionCategory[] = ['electricite'];
+
 const MY_DEMANDES: ActiveDemande[] = [
   { id: '1',  ot_id: 'ot-1', title: 'Panne tableau TGS-B2',             site: 'Siège Ben Arous',           status: 'clarification',                 type: 1, category: 'electricite', hours: 6,  hours_in_status: 6 },
   { id: '2',  ot_id: 'ot-2', title: 'Remplacement fusible armoire B3',  site: 'Siège Ben Arous',           status: 'in_progress',                   type: 1, category: 'electricite', hours: 3,  hours_in_status: 3 },
@@ -458,12 +461,23 @@ export default function ElectricienDashboard() {
           <h1 className="text-2xl font-bold text-slate-900">Mon espace — Prestataire de service</h1>
           <p className="text-slate-500 mt-0.5">{ELECTRICIAN_NAME} · {TODAY_DATE.split('/').reverse().join('/')} 2026</p>
         </div>
-        <Link
-          href="/demandes/new"
-          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors"
-        >
-          + Nouvelle demande
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/planning"
+            className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg hover:border-slate-500 hover:text-slate-900 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Planning semaine
+          </Link>
+          <Link
+            href="/demandes/new"
+            className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors"
+          >
+            + Nouvelle demande
+          </Link>
+        </div>
       </div>
 
       {/* ── Mes cadrans ─────────────────────────────────────────────────────── */}
@@ -523,6 +537,7 @@ export default function ElectricienDashboard() {
           selectedTypes={selectedTypes}
           onCategoriesChange={setSelectedCategories}
           onTypesChange={setSelectedTypes}
+          allowedCategories={ALLOWED_CATEGORIES}
         />
       </div>
 
