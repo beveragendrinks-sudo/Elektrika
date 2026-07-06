@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { ENTITY_LIST, getAllSites, entitySitesLabel, getEntitiesForSite } from '@/lib/entities';
 
 // ── Types ──────────────────────────────────────────────────────────────────

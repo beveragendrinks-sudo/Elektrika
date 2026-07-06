@@ -199,10 +199,10 @@ function ytdAvg(arr: number[]) {
 }
 
 const STATUS_SUMMARY = [
-  { label: 'Actives',           count: 12, color: 'bg-blue-100 text-blue-700' },
-  { label: 'À valider (moi)',   count: 3,  color: 'bg-amber-100 text-amber-700' },
-  { label: 'Planifiées demain', count: 4,  color: 'bg-violet-100 text-violet-700' },
-  { label: 'Clôturées ce mois', count: 28, color: 'bg-green-100 text-green-700' },
+  { label: 'Actives',           count: 12, color: 'bg-blue-100 text-blue-700',   href: '/demandes' },
+  { label: 'À valider (moi)',   count: 3,  color: 'bg-amber-100 text-amber-700', href: '/demandes' },
+  { label: 'Planifiées demain', count: 4,  color: 'bg-violet-100 text-violet-700', href: '/ordres-de-travail' },
+  { label: 'Clôturées ce mois', count: 28, color: 'bg-green-100 text-green-700', href: '/demandes' },
 ];
 
 const PENDING_VALIDATION = {
@@ -348,7 +348,8 @@ export default function DirecteurDashboard() {
         </p>
       </div>
 
-      {/* Quick actions */}
+      {/* Mes cadrans */}
+      <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Mes cadrans</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Link href="/demandes"
           className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 hover:bg-amber-100 transition-colors group">
@@ -387,10 +388,10 @@ export default function DirecteurDashboard() {
       {/* Résumé statuts */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
         {STATUS_SUMMARY.map((s) => (
-          <div key={s.label} className="bg-white rounded-lg border border-slate-200 p-4">
+          <Link key={s.label} href={s.href} className="bg-white rounded-lg border border-slate-200 p-4 hover:bg-slate-50 transition-colors">
             <div className={`text-xs font-medium px-2 py-0.5 rounded w-fit mb-2 ${s.color}`}>{s.label}</div>
             <div className="text-3xl font-bold text-slate-900">{s.count}</div>
-          </div>
+          </Link>
         ))}
       </div>
 

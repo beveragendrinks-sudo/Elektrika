@@ -1,4 +1,10 @@
 import { supabase } from './supabase';
+import {
+  emailMissionPlanifiee,
+  emailDemandePlanifiee,
+} from './emailTemplates';
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
 function nextWorkingDay(): string {
   const d = new Date();
@@ -39,8 +45,8 @@ export async function runDailyPlanningJob(): Promise<void> {
         request_id: req.request_id,
         level: 'escalation',
         recipient_user_id: null, // broadcast admins — à filtrer côté job
-        channel: 'app',
-        message: `Demande ${req.request_id.slice(0, 8)}… sans électricien assigné — planification impossible ce soir.`,
+        channel: 'email',
+        message: `Demande ${req.request_id.slice(0, 8)} sans prestataire assigné — planification impossible ce soir. Accès : ${APP_URL}/demandes`,
         status_at_trigger: 'ready_to_plan',
         hours_in_status: 0,
       });
@@ -79,24 +85,30 @@ export async function runDailyPlanningJob(): Promise<void> {
       .update({ status: 'planned', planned_mission_id: mission.mission_id })
       .eq('request_id', req.request_id);
 
-    // Notification → électricien
+    // Notification + email → prestataire
+    const emailPrestataire = emailMissionPlanifiee(missionDate);
     await supabase.from('notifications').insert({
       request_id: req.request_id,
       level: 'low',
       recipient_user_id: req.assigned_technician_id,
-      channel: 'app',
-      message: `Nouvelle mission planifiée pour le ${missionDate}. Demande ${req.request_id.slice(0, 8)}…`,
+      channel: 'email',
+      message: `Nouvelle mission planifiée pour le ${missionDate}. Voir : ${APP_URL}/dashboard/electricien`,
+      email_subject: emailPrestataire.subject,
+      email_html: emailPrestataire.html,
       status_at_trigger: 'planned',
       hours_in_status: 0,
     });
 
-    // Notification → demandeur
+    // Notification + email → demandeur
+    const emailDemandeur = emailDemandePlanifiee(missionDate);
     await supabase.from('notifications').insert({
       request_id: req.request_id,
       level: 'low',
       recipient_user_id: req.requested_by,
-      channel: 'app',
-      message: `Votre demande a été planifiée. Intervention prévue le ${missionDate}.`,
+      channel: 'email',
+      message: `Votre demande a été planifiée. Intervention prévue le ${missionDate}. Suivre : ${APP_URL}/dashboard/demandeur`,
+      email_subject: emailDemandeur.subject,
+      email_html: emailDemandeur.html,
       status_at_trigger: 'planned',
       hours_in_status: 0,
     });

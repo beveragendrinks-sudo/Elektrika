@@ -14,6 +14,7 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
   pending_management_validation: 'Validation direction',
   clarification: 'Clarification',
   preparation: 'Préparation',
+  awaiting_materials: 'Attente matériaux',
   ready_to_plan: 'Prête à planifier',
   planned: 'Planifiée',
   in_progress: "En cours d'exécution",
@@ -24,7 +25,8 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
 
 const STATUS_ORDER: RequestStatus[] = [
   'draft', 'pending_management_validation', 'clarification', 'preparation',
-  'ready_to_plan', 'planned', 'in_progress', 'completed_pending_confirmation', 'accepted',
+  'awaiting_materials', 'ready_to_plan', 'planned', 'in_progress',
+  'completed_pending_confirmation', 'accepted',
 ];
 
 export interface TimelineStep {

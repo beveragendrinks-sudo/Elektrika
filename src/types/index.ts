@@ -6,13 +6,14 @@ export type RequestStatus =
   | 'draft'                              // 1. brouillon, non soumise
   | 'pending_management_validation'      // 2. attente validation direction (sécurité/arrêt)
   | 'clarification'                      // 3. prestataire clarifie à distance
-  | 'preparation'                        // 4. achat matériel / devis / prestataire
-  | 'ready_to_plan'                      // 5. prête à planifier
-  | 'planned'                            // 6. planifiée
-  | 'in_progress'                        // 7. en cours d'exécution
-  | 'cancelled'                          // 8. annulée
-  | 'completed_pending_confirmation'     // 9. terminé, attente confirmation demandeur
-  | 'accepted';                          // 10. travaux acceptés (terminal)
+  | 'preparation'                        // 4. BCs en cours d'émission / devis / matériel
+  | 'awaiting_materials'                 // 5. BCs validés et envoyés — attente livraison matériaux
+  | 'ready_to_plan'                      // 6. prête à planifier (matériaux reçus ou pas de BC)
+  | 'planned'                            // 7. planifiée
+  | 'in_progress'                        // 8. en cours d'exécution
+  | 'cancelled'                          // 9. annulée
+  | 'completed_pending_confirmation'     // 10. terminé, attente confirmation demandeur
+  | 'accepted';                          // 11. travaux acceptés (terminal)
 
 export type UserRole = 'admin' | 'direction' | 'site_manager' | 'planner' | 'technician';
 

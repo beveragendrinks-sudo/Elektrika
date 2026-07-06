@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import type { RequestStatus } from '@/types';
+import type { RequestStatus, InterventionCategory } from '@/types';
 import Link from 'next/link';
+import FilterBar from '@/components/FilterBar';
+import type { ActiveCategories, ActiveTypes } from '@/components/FilterBar';
 
 const ELECTRICIAN_NAME = 'Mohamed Salah';
 const CAPACITY_MAX = 10;
@@ -35,7 +37,9 @@ interface ActiveDemande {
   site: string;
   status: RequestStatus;
   type: 1 | 2 | 3;
+  category: InterventionCategory;
   hours: number;
+  hours_in_status: number;
   mission_date?: string;
 }
 
@@ -87,26 +91,34 @@ const WEEK_PLAN: WeekDay[] = [
 ];
 
 const MY_DEMANDES: ActiveDemande[] = [
-  { id: '1', ot_id: 'ot-1', title: 'Panne tableau TGS-B2', site: 'Siège Ben Arous', status: 'clarification', type: 1, hours: 6 },
-  { id: '4', ot_id: 'ot-4', title: 'Disjoncteur Atelier C', site: 'Pôle Industriel Jbel Oust', status: 'planned', type: 1, hours: 0, mission_date: '2026-07-02' },
-  { id: '5', ot_id: 'ot-5', title: 'Remplacement variateur V-08', site: 'Megrine', status: 'preparation', type: 2, hours: 18 },
+  { id: '1',  ot_id: 'ot-1', title: 'Panne tableau TGS-B2',             site: 'Siège Ben Arous',           status: 'clarification',                 type: 1, category: 'electricite', hours: 6,  hours_in_status: 6 },
+  { id: '2',  ot_id: 'ot-2', title: 'Remplacement fusible armoire B3',  site: 'Siège Ben Arous',           status: 'in_progress',                   type: 1, category: 'electricite', hours: 3,  hours_in_status: 3 },
+  { id: '3',  ot_id: 'ot-3', title: 'Câblage armoire AT-04',            site: 'Siège Ben Arous',           status: 'completed_pending_confirmation', type: 3, category: 'electricite', hours: 0,  hours_in_status: 52 },
+  { id: '4',  ot_id: 'ot-4', title: 'Disjoncteur Atelier C',            site: 'Pôle Industriel Jbel Oust', status: 'planned',                       type: 1, category: 'electricite', hours: 0,  hours_in_status: 2, mission_date: '2026-07-02' },
+  { id: '5',  ot_id: 'ot-5', title: 'Remplacement variateur V-08',      site: 'Megrine',                   status: 'preparation',                   type: 2, category: 'electricite', hours: 0,  hours_in_status: 18 },
+  { id: '8',  ot_id: 'ot-8', title: 'Vérification tableau BT',          site: 'Pôle Industriel Jbel Oust', status: 'in_progress',                   type: 2, category: 'electricite', hours: 5,  hours_in_status: 5 },
+  { id: '9',  ot_id: undefined, title: 'Maintenance préventive armoire P2', site: 'Pôle Industriel Jbel Oust', status: 'ready_to_plan',              type: 3, category: 'electricite', hours: 0,  hours_in_status: 3 },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const STATUS_LABEL: Partial<Record<RequestStatus, string>> = {
-  clarification: 'Clarification',
-  preparation: 'Préparation',
-  ready_to_plan: 'Prête à planifier',
-  planned: 'Planifiée',
-  in_progress: 'En cours',
+  clarification:                  'Clarification',
+  preparation:                    'Préparation',
+  awaiting_materials:             'Attente matériaux',
+  ready_to_plan:                  'Prête à planifier',
+  planned:                        'Planifiée',
+  in_progress:                    'En cours',
+  completed_pending_confirmation: 'À confirmer',
 };
 
 const STATUS_COLOR: Partial<Record<RequestStatus, string>> = {
-  clarification: 'bg-yellow-100 text-yellow-700',
-  preparation: 'bg-blue-100 text-blue-700',
-  ready_to_plan: 'bg-violet-100 text-violet-700',
-  planned: 'bg-indigo-100 text-indigo-700',
-  in_progress: 'bg-cyan-100 text-cyan-700',
+  clarification:                  'bg-yellow-100 text-yellow-700',
+  preparation:                    'bg-blue-100 text-blue-700',
+  awaiting_materials:             'bg-orange-100 text-orange-700',
+  ready_to_plan:                  'bg-violet-100 text-violet-700',
+  planned:                        'bg-indigo-100 text-indigo-700',
+  in_progress:                    'bg-cyan-100 text-cyan-700',
+  completed_pending_confirmation: 'bg-teal-100 text-teal-700',
 };
 
 const TYPE_COLOR: Record<1 | 2 | 3, string> = {
@@ -135,6 +147,51 @@ function groupBySite(missions: WeekMission[]): Map<string, WeekMission[]> {
     map.set(m.site, list);
   }
   return map;
+}
+
+// ── SLA thresholds (heures dans le statut avant alerte / escalade) ─────────
+const SLA_BY_STATUS: Partial<Record<RequestStatus, { warn: number; escalate: number; label: string }>> = {
+  clarification:                 { warn: 4,  escalate: 24, label: 'Clarification sans réponse' },
+  preparation:                   { warn: 24, escalate: 72, label: 'Préparation prolongée' },
+  planned:                       { warn: 24, escalate: 72, label: 'Démarrage non confirmé' },
+  completed_pending_confirmation:{ warn: 24, escalate: 48, label: 'Confirmation demandeur attendue' },
+};
+
+const SLA_IN_PROGRESS: Record<1 | 2 | 3, { warn: number; escalate: number }> = {
+  1: { warn: 2,  escalate: 6  },  // panne simple
+  2: { warn: 8,  escalate: 24 },  // réparation
+  3: { warn: 24, escalate: 72 },  // travaux
+};
+
+type AlertLevel = 'escalate' | 'warn' | null;
+
+function getAlertLevel(d: ActiveDemande): AlertLevel {
+  const h = d.hours_in_status;
+  if (d.status === 'in_progress') {
+    const s = SLA_IN_PROGRESS[d.type];
+    if (h >= s.escalate) return 'escalate';
+    if (h >= s.warn)     return 'warn';
+    return null;
+  }
+  const s = SLA_BY_STATUS[d.status];
+  if (!s) return null;
+  if (h >= s.escalate) return 'escalate';
+  if (h >= s.warn)     return 'warn';
+  return null;
+}
+
+function getAlertMessage(d: ActiveDemande): string {
+  const h = d.hours_in_status;
+  const level = getAlertLevel(d);
+  if (!level) return '';
+  if (d.status === 'in_progress') {
+    const s = SLA_IN_PROGRESS[d.type];
+    const threshold = level === 'escalate' ? s.escalate : s.warn;
+    return `En cours depuis ${h}h · seuil ${TYPE_LABEL[d.type]} : ${threshold}h`;
+  }
+  const s = SLA_BY_STATUS[d.status]!;
+  const threshold = level === 'escalate' ? s.escalate : s.warn;
+  return `${s.label} · ${h}h dans ce statut · seuil : ${threshold}h`;
 }
 
 // ── Morning documents checklist ────────────────────────────────────────────
@@ -363,10 +420,34 @@ function DayCard({ day }: { day: WeekDay }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function ElectricienDashboard() {
+  const [selectedCategories, setSelectedCategories] = useState<ActiveCategories>([]);
+  const [selectedTypes, setSelectedTypes] = useState<ActiveTypes>([]);
+
   const todayMissions = WEEK_PLAN.find((d) => d.isToday)?.missions ?? [];
   const capacityUsed = todayMissions.reduce((s, m) => s + m.points, 0);
   const capacityPct = Math.round((capacityUsed / CAPACITY_MAX) * 100);
   const todayColor = capacityColor(capacityPct);
+
+  // Apply category + type filters to MY_DEMANDES
+  const filteredDemandes = MY_DEMANDES.filter(d => {
+    const catOk = selectedCategories.length === 0 || selectedCategories.includes(d.category);
+    const typeOk = selectedTypes.length === 0 || selectedTypes.includes(d.type);
+    return catOk && typeOk;
+  });
+
+  // Alertes : demandes dépassant leur SLA de statut
+  const alertedDemandes = filteredDemandes.filter(d => getAlertLevel(d) !== null)
+    .sort((a, b) => {
+      const order = { escalate: 0, warn: 1, null: 2 };
+      return (order[getAlertLevel(a) ?? 'null'] ?? 2) - (order[getAlertLevel(b) ?? 'null'] ?? 2);
+    });
+
+  // Résumé par statut
+  const statusCounts: Partial<Record<RequestStatus, number>> = {};
+  for (const d of filteredDemandes) {
+    statusCounts[d.status] = (statusCounts[d.status] ?? 0) + 1;
+  }
+  const statusSummary = Object.entries(statusCounts) as [RequestStatus, number][];
 
   return (
     <div className="space-y-2">
@@ -383,6 +464,141 @@ export default function ElectricienDashboard() {
         >
           + Nouvelle demande
         </Link>
+      </div>
+
+      {/* ── Mes cadrans ─────────────────────────────────────────────────────── */}
+      <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Mes cadrans</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Link href="/demandes"
+          className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 hover:bg-slate-100 transition-colors">
+          <span className="text-xl">📁</span>
+          <div>
+            <div className="text-lg font-bold text-slate-900">{MY_DEMANDES.length}</div>
+            <div className="text-xs text-slate-600 font-medium">Demandes affectées</div>
+          </div>
+        </Link>
+        <button
+          onClick={() => document.getElementById('section-alertes')?.scrollIntoView({ behavior: 'smooth' })}
+          className={`flex items-center gap-3 rounded-xl px-4 py-3 transition-colors text-left ${alertedDemandes.length > 0 ? 'bg-red-50 border border-red-200 hover:bg-red-100' : 'bg-green-50 border border-green-200 hover:bg-green-100'}`}>
+          <span className="text-xl">{alertedDemandes.length > 0 ? '⚠️' : '✅'}</span>
+          <div>
+            <div className={`text-lg font-bold ${alertedDemandes.length > 0 ? 'text-red-800' : 'text-green-800'}`}>
+              {alertedDemandes.length}
+            </div>
+            <div className={`text-xs font-medium ${alertedDemandes.length > 0 ? 'text-red-700' : 'text-green-700'}`}>
+              {alertedDemandes.length > 0 ? 'Alerte(s) active(s)' : 'Aucune alerte'}
+            </div>
+          </div>
+        </button>
+        <Link href="/bons-de-commande"
+          className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 hover:bg-orange-100 transition-colors">
+          <span className="text-xl">📋</span>
+          <div>
+            <div className="text-lg font-bold text-orange-900">1</div>
+            <div className="text-xs text-orange-700 font-medium">BC en attente</div>
+          </div>
+        </Link>
+        <Link href="/ordres-de-travail"
+          className="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 hover:bg-indigo-100 transition-colors">
+          <span className="text-xl">📅</span>
+          <div>
+            <div className="text-lg font-bold text-indigo-900">{todayMissions.length}</div>
+            <div className="text-xs text-indigo-700 font-medium">Missions aujourd&apos;hui</div>
+          </div>
+        </Link>
+      </div>
+
+      {/* ── Filtres demandes ──────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-2 mt-2">
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Filtrer mes demandes</h2>
+          {(selectedCategories.length > 0 || selectedTypes.length > 0) && (
+            <span className="text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">{filteredDemandes.length}</span> / {MY_DEMANDES.length}
+            </span>
+          )}
+        </div>
+        <FilterBar
+          selectedCategories={selectedCategories}
+          selectedTypes={selectedTypes}
+          onCategoriesChange={setSelectedCategories}
+          onTypesChange={setSelectedTypes}
+        />
+      </div>
+
+      {/* ── Résumé par statut ─────────────────────────────────────────────── */}
+      <div>
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 mt-2">
+          Mes demandes — Répartition par statut
+          {(selectedCategories.length > 0 || selectedTypes.length > 0) && (
+            <span className="ml-2 text-blue-500 normal-case font-normal">— vue filtrée</span>
+          )}
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {statusSummary.map(([status, count]) => {
+            const hasAlert = filteredDemandes.filter(d => d.status === status).some(d => getAlertLevel(d) !== null);
+            return (
+              <Link key={status} href="/demandes"
+                className="bg-white rounded-lg border border-slate-200 p-3 hover:bg-slate-50 transition-colors relative">
+                {hasAlert && (
+                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-400" title="Alerte active" />
+                )}
+                <div className={`text-xs font-medium px-2 py-0.5 rounded w-fit mb-2 ${STATUS_COLOR[status] ?? 'bg-slate-100 text-slate-500'}`}>
+                  {STATUS_LABEL[status] ?? status}
+                </div>
+                <div className="text-2xl font-bold text-slate-900">{count}</div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Alertes — Demandes dépassant leur SLA ───────────────────────── */}
+      <div id="section-alertes">
+        {alertedDemandes.length > 0 ? (
+          <div className="space-y-2">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 mt-2">
+              Alertes — Demandes en retard de traitement
+            </h2>
+            {alertedDemandes.map(d => {
+              const level = getAlertLevel(d)!;
+              const isEscalate = level === 'escalate';
+              return (
+                <div key={d.id}
+                  className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${isEscalate ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+                  <span className="text-lg shrink-0 mt-0.5">{isEscalate ? '🔴' : '⚠️'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm font-semibold ${isEscalate ? 'text-red-900' : 'text-amber-900'}`}>
+                      {d.title}
+                    </div>
+                    <div className={`text-xs mt-0.5 ${isEscalate ? 'text-red-700' : 'text-amber-700'}`}>
+                      {getAlertMessage(d)} · {d.site}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isEscalate ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {isEscalate ? 'ESCALADE' : 'ALERTE'}
+                    </span>
+                    {d.ot_id && (
+                      <Link href={`/ordres-de-travail/${d.ot_id}`}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-slate-300 text-slate-600 hover:border-slate-500 hover:text-slate-900 transition-colors font-medium">
+                        OT
+                      </Link>
+                    )}
+                    <Link href={`/demandes/${d.id}`}
+                      className="text-xs px-2.5 py-1 rounded-lg border border-slate-300 text-slate-600 hover:border-slate-500 hover:text-slate-900 transition-colors font-medium">
+                      Voir
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mt-2">
+            <div className="text-sm text-green-800 font-medium">✓ Aucune alerte — toutes vos demandes sont dans les délais</div>
+          </div>
+        )}
       </div>
 
       {/* 🖨️ Morning documents alert */}

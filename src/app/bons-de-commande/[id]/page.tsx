@@ -102,6 +102,34 @@ const MOCK_BCS: Record<string, BCData> = {
     ],
     notes: 'Livraison souhaitée avant le 05/07/2026. Contacter M. Salah avant livraison.',
   },
+  'bc-3': {
+    po_number: 'BC-FAD-2026-000027',
+    status: 'sent',
+    created_at: '2026-07-01',
+    entity: 'FAD',
+    electrician: 'Hichem Trabelsi',
+    demande: {
+      id: '8',
+      title: 'Remplacement pompe hydraulique P-12',
+      site: 'Jbel Oust',
+      type: 'Réparation avec matériel',
+      entity: 'FAD',
+      location_comment: 'Salle des machines — circuit hydraulique principal',
+    },
+    supplier: {
+      name: 'Techno Hydraulique Tunisie',
+      contact: 'M. Sami Mrad',
+      phone: '+216 73 456 789',
+      email: 'sami.mrad@techno-hyd.tn',
+      address: '22 Zone Industrielle Beni Khaled, 8061 Nabeul',
+    },
+    lines: [
+      { description: 'Pompe hydraulique à engrenages 18cc/tr', quantity: 1, unit: 'pièce', unit_price: 1250 },
+      { description: "Joint d'étanchéité kit complet", quantity: 2, unit: 'kit', unit_price: 45 },
+      { description: 'Huile hydraulique HM46 (bidon 20L)', quantity: 1, unit: 'bidon', unit_price: 85 },
+    ],
+    notes: 'Livraison urgente requise avant le 10/07/2026. La pompe actuelle est hors service.',
+  },
   'bc-2': {
     po_number: 'BC-LAD-2026-000038',
     status: 'confirmed',
@@ -458,6 +486,89 @@ function BCValidationPanel({ bcStatus }: { bcStatus: string }) {
   );
 }
 
+// ── BC Delivery Panel ──────────────────────────────────────────────────────
+// Visible par le prestataire ET le demandeur quand le BC est envoyé/confirmé.
+// Après marquage : BC → received ; si tous les BCs de la demande sont received,
+// la demande passe automatiquement en ready_to_plan.
+function BCDeliveryPanel({ bcStatus, demandeTitle }: { bcStatus: string; demandeTitle: string }) {
+  const [state, setState] = useState<'idle' | 'confirming' | 'done'>('idle');
+
+  if (bcStatus !== 'sent' && bcStatus !== 'confirmed') return null;
+
+  if (state === 'done') {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-xl px-6 py-5 flex items-center gap-4">
+        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+          <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <div>
+          <div className="font-bold text-green-800">Livraison confirmée</div>
+          <div className="text-sm text-green-600 mt-0.5">
+            Les matériaux ont été réceptionnés. Si tous les bons de commande de cette intervention sont livrés,
+            la demande passe automatiquement en <strong>Prête à planifier</strong>.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  async function confirmDelivery() {
+    setState('confirming');
+    await new Promise((r) => setTimeout(r, 800));
+    setState('done');
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="bg-blue-50 border-b border-blue-200 px-6 py-4 flex items-center gap-3">
+        <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7"
+          />
+        </svg>
+        <div>
+          <div className="font-semibold text-blue-900 text-sm">Réception des matériaux</div>
+          <div className="text-xs text-blue-700 mt-0.5">
+            Confirmez la livraison des matériaux pour l&apos;intervention : <em>{demandeTitle}</em>
+          </div>
+        </div>
+      </div>
+      <div className="px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
+        <div className="text-sm text-slate-600">
+          <span className="font-semibold text-slate-800">Prestataire ou demandeur</span> — cliquez sur le bouton
+          ci-contre pour confirmer que les matériaux commandés ont bien été livrés sur site.
+        </div>
+        <button
+          onClick={confirmDelivery}
+          disabled={state === 'confirming'}
+          className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center gap-2 flex-shrink-0"
+        >
+          {state === 'confirming' ? (
+            <>
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Confirmation…
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              BC livré — matériaux reçus
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Inner page ─────────────────────────────────────────────────────────────
 function BCPageInner({ id }: { id: string }) {
   const searchParams = useSearchParams();
@@ -593,6 +704,7 @@ function BCPageInner({ id }: { id: string }) {
 
       <div className="max-w-4xl mx-auto space-y-6">
         <BCValidationPanel bcStatus={bc.status} />
+        <BCDeliveryPanel bcStatus={bc.status} demandeTitle={bc.demande.title} />
         <BCDocument bc={bc} docRef={docRef} />
       </div>
     </>

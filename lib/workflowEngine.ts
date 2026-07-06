@@ -10,7 +10,9 @@ export const STATUS_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
   draft: ['pending_management_validation', 'clarification', 'cancelled'],
   pending_management_validation: ['clarification', 'cancelled'],
   clarification: ['preparation', 'ready_to_plan', 'cancelled'],
-  preparation: ['ready_to_plan', 'cancelled'],
+  preparation: ['awaiting_materials', 'ready_to_plan', 'cancelled'],
+  // awaiting_materials → ready_to_plan déclenché automatiquement quand tous les BCs sont received
+  awaiting_materials: ['ready_to_plan', 'cancelled'],
   ready_to_plan: ['planned', 'cancelled'],
   planned: ['in_progress', 'cancelled'],
   in_progress: ['completed_pending_confirmation', 'cancelled'],
@@ -175,14 +177,15 @@ export function pointsForType(type: 1 | 2 | 3): 1 | 3 | 5 {
 }
 
 /**
- * Un bon de commande ne peut être généré que pendant le statut "preparation".
+ * Un bon de commande peut être généré pendant "preparation" ou "awaiting_materials"
+ * (si un BC supplémentaire doit être ajouté après envoi du premier).
  * Miroir côté app du trigger SQL trg_enforce_po_creation_status.
  */
 export function canGeneratePurchaseOrder(status: RequestStatus): TransitionResult {
-  if (status !== 'preparation') {
+  if (status !== 'preparation' && status !== 'awaiting_materials') {
     return {
       allowed: false,
-      reason: `Le bon de commande ne peut être créé qu'au statut "préparation" (statut actuel : ${status})`,
+      reason: `Le bon de commande ne peut être créé qu'aux statuts "préparation" ou "attente matériaux" (statut actuel : ${status})`,
     };
   }
   return { allowed: true };

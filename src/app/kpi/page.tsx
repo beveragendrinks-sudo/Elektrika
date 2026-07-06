@@ -1,18 +1,23 @@
 'use client';
 
+import { useState } from 'react';
 import { computeOEI } from '@/lib/kpiEngine';
+import { INTERVENTION_CATEGORIES } from '@/lib/interventionTypes';
+import type { InterventionCategory } from '@/types';
+import FilterBar from '@/components/FilterBar';
+import type { ActiveCategories, ActiveTypes } from '@/components/FilterBar';
 
 // ── Trend data (6 months Fév–Jul) ─────────────────────────────────────────
 const MONTHS = ['Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul'];
 
 const TREND = {
-  mttr:        [42, 38, 35, 33, 32, 31],
-  sla48:       [80, 82, 84, 85, 85, 87],
-  first_fix:   [84, 86, 87, 88, 90, 91],
-  grouping:    [60, 62, 63, 65, 66, 67],
+  mttr:          [42, 38, 35, 33, 32, 31],
+  sla48:         [80, 82, 84, 85, 85, 87],
+  first_fix:     [84, 86, 87, 88, 90, 91],
+  grouping:      [60, 62, 63, 65, 66, 67],
   interventions: [22, 24, 26, 28, 25, 28],
-  bc_delay:    [5.1, 4.8, 4.2, 3.9, 3.5, 3.2],
-  satisfaction:[3.9, 4.0, 4.1, 4.1, 4.1, 4.2],
+  bc_delay:      [5.1, 4.8, 4.2, 3.9, 3.5, 3.2],
+  satisfaction:  [3.9, 4.0, 4.1, 4.1, 4.1, 4.2],
 };
 
 const ANNUAL_BUDGET = { allocated: 250000, spent: 115880, committed: 28400 };
@@ -24,6 +29,119 @@ const MOCK_COMPONENTS = {
   groupingEfficiencyPct: TREND.grouping[5],
 };
 
+// ── Per-category KPI data ──────────────────────────────────────────────────
+interface CategoryKpiData {
+  mttr: number;
+  sla48: number;
+  firstFix: number;
+  count: number;
+  utilization: number;
+  monthly: number[];
+}
+
+const CATEGORY_KPIS: Record<InterventionCategory, CategoryKpiData> = {
+  electricite:   { mttr: 31, sla48: 87, firstFix: 91, count: 48, utilization: 82, monthly: [14,15,16,17,16,18] },
+  plomberie:     { mttr: 22, sla48: 94, firstFix: 92, count: 18, utilization: 65, monthly: [3,4,4,4,3,4] },
+  climatisation: { mttr: 45, sla48: 82, firstFix: 78, count: 12, utilization: 55, monthly: [2,2,2,3,2,2] },
+  maconnerie:    { mttr: 72, sla48: 75, firstFix: 70, count: 6,  utilization: 45, monthly: [1,1,1,1,1,1] },
+  peinture:      { mttr: 28, sla48: 96, firstFix: 95, count: 8,  utilization: 38, monthly: [1,1,1,2,1,2] },
+  menuiserie:    { mttr: 18, sla48: 97, firstFix: 94, count: 6,  utilization: 42, monthly: [1,1,1,1,1,1] },
+  autres:        { mttr: 35, sla48: 85, firstFix: 80, count: 6,  utilization: 40, monthly: [1,1,1,1,1,1] },
+};
+
+// ── Per-type KPI data ──────────────────────────────────────────────────────
+interface TypeKpiData {
+  mttr: number;
+  sla48: number;
+  firstFix: number;
+  count: number;
+  monthly: number[];
+}
+
+const TYPE_KPIS: Record<1 | 2 | 3, TypeKpiData> = {
+  1: { mttr: 12, sla48: 95, firstFix: 92, count: 42, monthly: [10,11,11,12,11,12] },
+  2: { mttr: 32, sla48: 87, firstFix: 85, count: 38, monthly: [8,9,10,11,9,11] },
+  3: { mttr: 72, sla48: 74, firstFix: 72, count: 24, monthly: [4,4,5,5,5,5] },
+};
+
+// ── Filtered metrics computation ───────────────────────────────────────────
+interface FilteredMetrics {
+  mttr: number;
+  sla48: number;
+  firstFix: number;
+  count: number;
+  utilization: number;
+  monthly: number[];
+  mttrTrend: number[];
+  sla48Trend: number[];
+  firstFixTrend: number[];
+}
+
+function weightedAvg(items: { value: number; weight: number }[]): number {
+  const total = items.reduce((s, i) => s + i.weight, 0);
+  if (total === 0) return 0;
+  return Math.round(items.reduce((s, i) => s + i.value * i.weight, 0) / total);
+}
+
+function sumMonthlyArrays(arrays: number[][]): number[] {
+  if (arrays.length === 0) return [0, 0, 0, 0, 0, 0];
+  return arrays.reduce((acc, arr) => acc.map((v, i) => v + arr[i]), [0, 0, 0, 0, 0, 0]);
+}
+
+function makeDecliningTrend(end: number, totalDrop: number): number[] {
+  return MONTHS.map((_, i) => Math.round(end + ((MONTHS.length - 1 - i) / (MONTHS.length - 1)) * totalDrop));
+}
+
+function makeRisingTrend(end: number, totalRise: number): number[] {
+  return MONTHS.map((_, i) => Math.round(end - ((MONTHS.length - 1 - i) / (MONTHS.length - 1)) * totalRise));
+}
+
+function computeFiltered(cats: ActiveCategories, types: ActiveTypes): FilteredMetrics | null {
+  if (cats.length === 0 && types.length === 0) return null;
+
+  if (cats.length === 0) {
+    // Type filter only
+    const items = types.map(t => TYPE_KPIS[t]);
+    const total = items.reduce((s, k) => s + k.count, 0);
+    const mttr = weightedAvg(items.map(k => ({ value: k.mttr, weight: k.count })));
+    const sla48 = weightedAvg(items.map(k => ({ value: k.sla48, weight: k.count })));
+    const firstFix = weightedAvg(items.map(k => ({ value: k.firstFix, weight: k.count })));
+    const monthly = sumMonthlyArrays(items.map(k => k.monthly));
+    return {
+      mttr, sla48, firstFix, count: total, utilization: MOCK_COMPONENTS.utilizationRatePct, monthly,
+      mttrTrend: makeDecliningTrend(mttr, Math.round(mttr * 0.25)),
+      sla48Trend: makeRisingTrend(sla48, Math.round(sla48 * 0.07)),
+      firstFixTrend: makeRisingTrend(firstFix, Math.round(firstFix * 0.07)),
+    };
+  }
+
+  // Category filter (with optional type filter)
+  const catItems = cats.map(c => CATEGORY_KPIS[c]);
+  const totalCatCount = catItems.reduce((s, k) => s + k.count, 0);
+  const mttr = weightedAvg(catItems.map(k => ({ value: k.mttr, weight: k.count })));
+  const sla48 = weightedAvg(catItems.map(k => ({ value: k.sla48, weight: k.count })));
+  const firstFix = weightedAvg(catItems.map(k => ({ value: k.firstFix, weight: k.count })));
+  const utilization = weightedAvg(catItems.map(k => ({ value: k.utilization, weight: k.count })));
+  let monthly = sumMonthlyArrays(catItems.map(k => k.monthly));
+
+  let count = totalCatCount;
+  if (types.length > 0) {
+    const allTypeCount = Object.values(TYPE_KPIS).reduce((s, k) => s + k.count, 0);
+    const selTypeCount = types.reduce((s, t) => s + TYPE_KPIS[t].count, 0);
+    const ratio = selTypeCount / allTypeCount;
+    count = Math.round(totalCatCount * ratio);
+    monthly = monthly.map(v => Math.round(v * ratio));
+  }
+
+  return {
+    mttr, sla48, firstFix, count, utilization, monthly,
+    mttrTrend: makeDecliningTrend(mttr, Math.round(mttr * 0.25)),
+    sla48Trend: makeRisingTrend(sla48, Math.round(sla48 * 0.07)),
+    firstFixTrend: makeRisingTrend(firstFix, Math.round(firstFix * 0.07)),
+  };
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
 const oei = computeOEI(MOCK_COMPONENTS);
 
 function ytdAvg(arr: number[]) {
@@ -130,8 +248,7 @@ function TrendKpiCard({
 }
 
 // ── Monthly bar chart ──────────────────────────────────────────────────────
-function MonthlyBarChart() {
-  const data = TREND.interventions;
+function MonthlyBarChart({ data }: { data: number[] }) {
   const max  = Math.max(...data);
   const ytd  = ytdAvg(data);
   const delta = data[5] - data[4];
@@ -224,8 +341,102 @@ function BudgetBar({ allocated, spent, committed }: { allocated: number; spent: 
   );
 }
 
+// ── Category breakdown cards ───────────────────────────────────────────────
+function CategoryBreakdown({ cats, types }: { cats: ActiveCategories; types: ActiveTypes }) {
+  const items: Array<{ id: string; icon: string; label: string; mttr: number; sla48: number; firstFix: number; count: number }> = [];
+
+  if (cats.length > 0) {
+    for (const c of cats) {
+      const cat = INTERVENTION_CATEGORIES.find(x => x.id === c);
+      const kpi = CATEGORY_KPIS[c];
+      if (cat && kpi) {
+        items.push({ id: c, icon: cat.icon, label: cat.label, ...kpi });
+      }
+    }
+  } else if (types.length > 0) {
+    const typeLabels: Record<1|2|3, string> = { 1: 'Panne simple', 2: 'Réparation', 3: 'Travaux' };
+    const typeIcons: Record<1|2|3, string> = { 1: '⚡', 2: '🔧', 3: '🏗️' };
+    for (const t of types) {
+      const kpi = TYPE_KPIS[t];
+      items.push({ id: `type-${t}`, icon: typeIcons[t], label: `Type ${t} — ${typeLabels[t]}`, ...kpi });
+    }
+  }
+
+  if (items.length <= 1) return null;
+
+  return (
+    <div>
+      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+        Répartition par {cats.length > 0 ? 'catégorie' : 'type'}
+      </h3>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {items.map(item => {
+          const mttrOk = item.mttr <= 48;
+          const slaOk = item.sla48 >= 90;
+          return (
+            <div key={item.id} className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{item.icon}</span>
+                <div className="text-xs font-semibold text-slate-700 leading-tight">{item.label}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div>
+                  <div className={`text-xl font-bold ${mttrOk ? 'text-green-600' : 'text-amber-600'}`}>{item.mttr}h</div>
+                  <div className="text-xs text-slate-400">MTTR</div>
+                </div>
+                <div>
+                  <div className={`text-xl font-bold ${slaOk ? 'text-green-600' : 'text-amber-600'}`}>{item.sla48}%</div>
+                  <div className="text-xs text-slate-400">SLA 48h</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100">
+                <span>1er passage : <span className="font-semibold text-slate-700">{item.firstFix}%</span></span>
+                <span className="text-slate-400">{item.count} int.</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function KpiPage() {
+  const [selectedCategories, setSelectedCategories] = useState<ActiveCategories>([]);
+  const [selectedTypes, setSelectedTypes] = useState<ActiveTypes>([]);
+
+  const filtered = computeFiltered(selectedCategories, selectedTypes);
+  const hasFilter = selectedCategories.length > 0 || selectedTypes.length > 0;
+
+  const displayMttr      = filtered ? filtered.mttr      : TREND.mttr[5];
+  const displayMttrPrev  = filtered ? filtered.mttrTrend[4] : TREND.mttr[4];
+  const displayMttrTrend = filtered ? filtered.mttrTrend : TREND.mttr;
+
+  const displaySla48      = filtered ? filtered.sla48      : TREND.sla48[5];
+  const displaySla48Prev  = filtered ? filtered.sla48Trend[4] : TREND.sla48[4];
+  const displaySla48Trend = filtered ? filtered.sla48Trend : TREND.sla48;
+
+  const displayFirstFix      = filtered ? filtered.firstFix      : TREND.first_fix[5];
+  const displayFirstFixPrev  = filtered ? filtered.firstFixTrend[4] : TREND.first_fix[4];
+  const displayFirstFixTrend = filtered ? filtered.firstFixTrend : TREND.first_fix;
+
+  const displayMonthly = filtered ? filtered.monthly : TREND.interventions;
+
+  const filteredOei = filtered
+    ? computeOEI({
+        utilizationRatePct:    filtered.utilization,
+        sla48CompliancePct:    filtered.sla48,
+        firstTimeFixRatePct:   filtered.firstFix,
+        groupingEfficiencyPct: MOCK_COMPONENTS.groupingEfficiencyPct,
+      })
+    : oei;
+
+  const filterLabel = [
+    ...selectedCategories.map(c => INTERVENTION_CATEGORIES.find(x => x.id === c)?.label ?? c),
+    ...selectedTypes.map(t => `Type ${t}`),
+  ].join(' · ');
+
   return (
     <div className="space-y-6">
       <div>
@@ -235,6 +446,25 @@ export default function KpiPage() {
           Barres = évolution mensuelle · Barre verte/rouge = mois en cours · ▲▼ = variation vs mois précédent · Moy. YTD = moyenne annuelle à ce jour
         </p>
       </div>
+
+      <FilterBar
+        selectedCategories={selectedCategories}
+        selectedTypes={selectedTypes}
+        onCategoriesChange={setSelectedCategories}
+        onTypesChange={setSelectedTypes}
+      />
+
+      {/* Filtered view banner */}
+      {hasFilter && (
+        <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5">
+          <span className="text-blue-500">◈</span>
+          <span className="text-sm text-blue-800 font-medium">Vue filtrée</span>
+          <span className="text-xs text-blue-600">{filterLabel}</span>
+          <span className="ml-auto text-xs text-blue-500">
+            {filtered?.count} interventions dans cette sélection
+          </span>
+        </div>
+      )}
 
       {/* OEI global */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
@@ -246,46 +476,59 @@ export default function KpiPage() {
             <div className="text-xs text-blue-500 mt-2 leading-relaxed">
               30% productivité · 25% SLA · 25% qualité 1er passage · 20% optimisation groupage
             </div>
-            {/* OEI trend note */}
             <div className="flex items-center gap-3 mt-2">
-              <span className="text-xs text-green-600 font-semibold">▲ +2.1 vs M-1</span>
-              <span className="text-xs text-blue-400">Moy. YTD : 74.8</span>
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Objectif ≥ 70</span>
+              {hasFilter ? (
+                <span className="text-xs text-blue-500">Calculé sur la sélection filtrée</span>
+              ) : (
+                <>
+                  <span className="text-xs text-green-600 font-semibold">▲ +2.1 vs M-1</span>
+                  <span className="text-xs text-blue-400">Moy. YTD : 74.8</span>
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Objectif ≥ 70</span>
+                </>
+              )}
             </div>
           </div>
-          <div className={`text-5xl font-black shrink-0 ${oei >= 80 ? 'text-green-600' : oei >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
-            {oei.toFixed(1)}
+          <div className={`text-5xl font-black shrink-0 ${filteredOei >= 80 ? 'text-green-600' : filteredOei >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+            {filteredOei.toFixed(1)}
           </div>
         </div>
       </div>
 
-      {/* Budget */}
+      {/* Budget — always global */}
       <BudgetBar allocated={ANNUAL_BUDGET.allocated} spent={ANNUAL_BUDGET.spent} committed={ANNUAL_BUDGET.committed} />
 
       {/* Monthly interventions chart */}
-      <MonthlyBarChart />
+      <MonthlyBarChart data={displayMonthly} />
+
+      {/* Category/type breakdown when multiple items selected */}
+      {hasFilter && <CategoryBreakdown cats={selectedCategories} types={selectedTypes} />}
 
       {/* KPI cards with trends */}
       <div>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Indicateurs Détaillés — Tendances &amp; Objectifs</h2>
+        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
+          Indicateurs Détaillés
+          {hasFilter && <span className="ml-2 text-blue-500 normal-case font-normal text-xs">— vue filtrée</span>}
+        </h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <TrendKpiCard
             label="Taux d'utilisation des techniciens"
-            current={MOCK_COMPONENTS.utilizationRatePct} prev={75} ytd={72}
-            unit="%" target={80} months={[70,72,73,75,75,78]}
+            current={filtered ? filtered.utilization : MOCK_COMPONENTS.utilizationRatePct}
+            prev={filtered ? filtered.utilization + 3 : 75}
+            ytd={filtered ? filtered.utilization - 3 : 72}
+            unit="%" target={80} months={filtered ? makeDecliningTrend(filtered.utilization, -8).reverse() : [70,72,73,75,75,78]}
             targetLabel="Objectif 75–85% — au-dessus peut indiquer une surcharge"
           />
           <TrendKpiCard
             acronym="SLA 48h"
             label="Conformité délai de traitement < 48h"
-            current={TREND.sla48[5]} prev={TREND.sla48[4]} ytd={ytdAvg(TREND.sla48)}
-            unit="%" target={90} months={TREND.sla48}
+            current={displaySla48} prev={displaySla48Prev} ytd={ytdAvg(displaySla48Trend)}
+            unit="%" target={90} months={displaySla48Trend}
             targetLabel="Service Level Agreement — proportion traitée en < 48h"
           />
           <TrendKpiCard
             label="Taux de réparation au 1er passage"
-            current={TREND.first_fix[5]} prev={TREND.first_fix[4]} ytd={ytdAvg(TREND.first_fix)}
-            unit="%" target={85} months={TREND.first_fix}
+            current={displayFirstFix} prev={displayFirstFixPrev} ytd={ytdAvg(displayFirstFixTrend)}
+            unit="%" target={85} months={displayFirstFixTrend}
             targetLabel="Sans re-intervention dans les 7 jours"
           />
           <TrendKpiCard
@@ -304,8 +547,8 @@ export default function KpiPage() {
           <TrendKpiCard
             acronym="MTTR"
             label="Mean Time To Repair — Temps Moyen de Réparation"
-            current={TREND.mttr[5]} prev={TREND.mttr[4]} ytd={ytdAvg(TREND.mttr)}
-            unit="h" target={48} months={TREND.mttr} inverse={true}
+            current={displayMttr} prev={displayMttrPrev} ytd={ytdAvg(displayMttrTrend)}
+            unit="h" target={48} months={displayMttrTrend} inverse={true}
             targetLabel="Objectif : clôturer chaque intervention en < 48h"
           />
           <TrendKpiCard

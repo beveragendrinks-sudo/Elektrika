@@ -244,7 +244,8 @@ export default function DGDashboard() {
         </p>
       </div>
 
-      {/* Quick actions */}
+      {/* Mes cadrans */}
+      <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Mes cadrans</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Link href="/demandes"
           className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 hover:bg-amber-100 transition-colors">

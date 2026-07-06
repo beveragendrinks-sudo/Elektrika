@@ -10,7 +10,6 @@ import { computePriorityScore } from '@/lib/workflowEngine';
 interface Props {
   interventionSites: { intervention_site_id: string; label: string }[];
   entities: { entity_id: string; code: string; name: string }[];
-  technicians: { technician_id: string; name: string }[];
 }
 
 interface FormState {
@@ -19,7 +18,6 @@ interface FormState {
   category: string;
   nature: string;
   issuing_entity_id: string;
-  assigned_technician_id: string;
   contact_type: 'demandeur' | 'autre';
   contact_name: string;
   contact_phone: string;
@@ -34,7 +32,6 @@ const EMPTY_FORM: FormState = {
   category: '',
   nature: '',
   issuing_entity_id: '',
-  assigned_technician_id: '',
   contact_type: 'demandeur',
   contact_name: '',
   contact_phone: '',
@@ -137,7 +134,7 @@ function SuccessScreen({ requestId, willNeedValidation }: { requestId: string; w
 }
 
 // ── Main form ──────────────────────────────────────────────────────────────
-export default function NewDemandeForm({ interventionSites, entities, technicians }: Props) {
+export default function NewDemandeForm({ interventionSites, entities }: Props) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [photos, setPhotos] = useState<File[]>([]);
@@ -161,7 +158,6 @@ export default function NewDemandeForm({ interventionSites, entities, technician
     }
     if (s === 3) {
       if (!form.issuing_entity_id) e.issuing_entity_id = 'Choisissez l\'entité émettrice';
-      if (!form.assigned_technician_id) e.assigned_technician_id = 'Assignez un prestataire de service';
     }
     return e;
   }
@@ -224,7 +220,6 @@ export default function NewDemandeForm({ interventionSites, entities, technician
           category: form.category,
           intervention_nature: form.nature,
           issuing_entity_id: form.issuing_entity_id,
-          assigned_technician_id: form.assigned_technician_id,
           safety_risk: form.safety_risk,
           production_stop: form.production_stop,
           status: initialStatus,
@@ -286,7 +281,6 @@ export default function NewDemandeForm({ interventionSites, entities, technician
   const selectedCategory = getCategoryById(form.category);
   const selectedNature = getNatureById(form.nature);
   const selectedEntity = entities.find((e) => e.entity_id === form.issuing_entity_id);
-  const selectedTech = technicians.find((t) => t.technician_id === form.assigned_technician_id);
   const needsValidation = form.safety_risk || form.production_stop;
 
   if (successId) {
@@ -447,7 +441,7 @@ export default function NewDemandeForm({ interventionSites, entities, technician
         <section className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
           <div>
             <h2 className="font-semibold text-slate-900 mb-1">Organisation</h2>
-            <p className="text-sm text-slate-500">Entité concernée et prestataire de service responsable de la demande.</p>
+            <p className="text-sm text-slate-500">Entité émettrice et contact pour la clarification.</p>
           </div>
 
           <div>
@@ -475,43 +469,6 @@ export default function NewDemandeForm({ interventionSites, entities, technician
             </div>
             {errors.issuing_entity_id && (
               <p className="text-red-500 text-xs mt-1.5">{errors.issuing_entity_id}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Prestataire de service <span className="text-red-500">*</span>
-            </label>
-            <div className="space-y-2">
-              {technicians.map((t) => (
-                <button
-                  key={t.technician_id}
-                  type="button"
-                  onClick={() => {
-                    setForm((f) => ({ ...f, assigned_technician_id: t.technician_id }));
-                    setErrors((e) => ({ ...e, assigned_technician_id: '' }));
-                  }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-all text-left ${
-                    form.assigned_technician_id === t.technician_id
-                      ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-sm font-bold text-slate-600 flex-shrink-0">
-                    {t.name.charAt(0)}
-                  </div>
-                  <span className="font-medium text-slate-900">{t.name}</span>
-                  {form.assigned_technician_id === t.technician_id && (
-                    <span className="ml-auto text-slate-900 text-lg">✓</span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-slate-400 mt-2">
-              Peut être modifié par le directeur lors de la validation. Seuls les prestataires couvrant cette catégorie sont notifiés.
-            </p>
-            {errors.assigned_technician_id && (
-              <p className="text-red-500 text-xs mt-1">{errors.assigned_technician_id}</p>
             )}
           </div>
 
@@ -686,6 +643,7 @@ export default function NewDemandeForm({ interventionSites, entities, technician
               <div className="grid grid-cols-5 gap-2">
                 {photos.map((f, i) => (
                   <div key={i} className="relative group aspect-square">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={URL.createObjectURL(f)}
                       alt=""
@@ -730,7 +688,7 @@ export default function NewDemandeForm({ interventionSites, entities, technician
               </div>
               <div className="flex justify-between">
                 <dt className="text-slate-500">Prestataire</dt>
-                <dd className="font-medium text-slate-900">{selectedTech?.name}</dd>
+                <dd className="font-medium text-slate-400 italic">Assigné par le responsable</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-slate-500">Contact clarification</dt>

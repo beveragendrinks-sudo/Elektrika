@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -21,6 +21,17 @@ export default function LoginPage() {
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
 
+  // Redirection automatique si déjà connecté
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('fm_session');
+      if (raw) {
+        const session = JSON.parse(raw);
+        if (session?.dashboard) router.replace(session.dashboard);
+      }
+    } catch { /* ignore */ }
+  }, [router]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -29,6 +40,13 @@ export default function LoginPage() {
 
     const user = DEMO_USERS[email.trim().toLowerCase()];
     if (user && password === user.password) {
+      const em = email.trim().toLowerCase();
+      localStorage.setItem('fm_session', JSON.stringify({
+        email: em,
+        role: user.role,
+        label: user.label,
+        dashboard: user.dashboard,
+      }));
       router.push(user.dashboard);
     } else {
       setError('Email ou mot de passe incorrect. Vérifiez vos identifiants ou contactez votre administrateur.');

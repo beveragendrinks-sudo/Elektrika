@@ -10,6 +10,7 @@ const STATUS_LABEL: Record<RequestStatus, string> = {
   pending_management_validation:  'Attente validation',
   clarification:                  'Clarification',
   preparation:                    'Préparation',
+  awaiting_materials:             'Attente matériaux',
   ready_to_plan:                  'Prête à planifier',
   planned:                        'Planifiée',
   in_progress:                    'En cours',
@@ -23,6 +24,7 @@ const STATUS_COLOR: Record<RequestStatus, string> = {
   pending_management_validation:  'bg-amber-100 text-amber-700',
   clarification:                  'bg-orange-100 text-orange-700',
   preparation:                    'bg-yellow-100 text-yellow-700',
+  awaiting_materials:             'bg-orange-100 text-orange-700',
   ready_to_plan:                  'bg-sky-100 text-sky-700',
   planned:                        'bg-violet-100 text-violet-700',
   in_progress:                    'bg-blue-100 text-blue-700',
@@ -107,6 +109,14 @@ const MOCK_DEMANDES: Demande[] = [
     prestataire: 'Anis Trabelsi', prestataireAvgRating: 4.7, myRating: null,
     fournisseurBC: 'ClimaTech Tunisie',
     createdAt: '2026-06-20', updatedAt: '2026-07-02', daysElapsed: 12,
+  },
+  {
+    id: 'd7', ref: 'DEM-2026-044', title: 'Remplacement pompe hydraulique P-12',
+    category: 'plomberie', nature: 'corrective',
+    site: 'Pôle Industriel, Jbel Oust', status: 'awaiting_materials',
+    prestataire: 'Hichem Trabelsi', prestataireAvgRating: 4.0, myRating: null,
+    fournisseurBC: 'Techno Hydraulique Tunisie',
+    createdAt: '2026-07-01', updatedAt: '2026-07-05', daysElapsed: 5,
   },
   {
     id: 'd4', ref: 'DEM-2026-028', title: 'Peinture couloir niveau 2',
@@ -200,8 +210,8 @@ function DemandeRow({
 
   return (
     <li className="px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3 border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">
-      {/* Left: category icon + info */}
-      <div className="flex items-start gap-3 flex-1 min-w-0">
+      {/* Left: category icon + info — cliquable → fiche demande */}
+      <Link href={`/demandes/${demande.id}`} className="flex items-start gap-3 flex-1 min-w-0 group/link">
         <span className="text-2xl mt-0.5 shrink-0">{CAT_ICON[demande.category]}</span>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -210,7 +220,7 @@ function DemandeRow({
               {STATUS_LABEL[demande.status]}
             </span>
           </div>
-          <div className="font-medium text-slate-900 text-sm mt-0.5 leading-tight">{demande.title}</div>
+          <div className="font-medium text-slate-900 text-sm mt-0.5 leading-tight group-hover/link:text-blue-600 transition-colors">{demande.title}</div>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-slate-500">
             <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">
               {CAT_LABEL[demande.category]}
@@ -221,7 +231,7 @@ function DemandeRow({
             <span>📍 {demande.site}</span>
           </div>
         </div>
-      </div>
+      </Link>
 
       {/* Right: prestataire (1er) + fournisseur BC (2ème) + date */}
       <div className="flex flex-col items-start sm:items-end gap-1.5 shrink-0 min-w-[160px]">
@@ -326,24 +336,52 @@ export default function DemandeurDashboard() {
       {/* ── Alertes ── */}
       <AlertCard demandes={demandes} />
 
-      {/* ── Récapitulatif statuts ── */}
-      {summaryItems.length > 0 && (
-        <div>
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-            Demandes en cours — récapitulatif
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {summaryItems.map(({ status, count }) => (
-              <div key={status} className="bg-white rounded-lg border border-slate-200 p-4">
-                <div className={`text-xs font-medium px-2 py-0.5 rounded w-fit mb-2 ${STATUS_COLOR[status]}`}>
-                  {STATUS_LABEL[status]}
-                </div>
-                <div className="text-3xl font-bold text-slate-900">{count}</div>
-              </div>
-            ))}
+      {/* ── Attente matériaux ── */}
+      {ongoing.filter(d => d.status === 'awaiting_materials').map(d => (
+        <div key={d.id} className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+          <svg className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V7"
+            />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-orange-900">{d.ref} — {d.title}</div>
+            <div className="text-xs text-orange-700 mt-0.5">
+              Matériaux commandés chez <strong>{d.fournisseurBC}</strong>.
+              Vous pouvez confirmer la livraison depuis le bon de commande dès réception.
+            </div>
           </div>
+          <Link
+            href={`/bons-de-commande?filter=sent`}
+            className="shrink-0 text-xs font-semibold text-orange-700 hover:text-orange-900 underline underline-offset-2"
+          >
+            Voir BC →
+          </Link>
         </div>
-      )}
+      ))}
+
+      {/* ── Mes cadrans ── */}
+      <div>
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Mes cadrans</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {summaryItems.map(({ status, count }) => (
+            <Link key={status} href="/demandes" className="bg-white rounded-lg border border-slate-200 p-4 hover:bg-slate-50 transition-colors">
+              <div className={`text-xs font-medium px-2 py-0.5 rounded w-fit mb-2 ${STATUS_COLOR[status]}`}>
+                {STATUS_LABEL[status]}
+              </div>
+              <div className="text-3xl font-bold text-slate-900">{count}</div>
+            </Link>
+          ))}
+          <Link href="/demandes/new"
+            className="flex items-center gap-3 bg-slate-900 rounded-xl px-4 py-3 hover:bg-slate-700 transition-colors">
+            <span className="text-xl">➕</span>
+            <div>
+              <div className="text-sm font-bold text-white">Nouvelle demande</div>
+              <div className="text-xs text-slate-400">Créer une intervention</div>
+            </div>
+          </Link>
+        </div>
+      </div>
 
       {/* ── Demandes en cours ── */}
       <div className="bg-white rounded-xl border border-slate-200">

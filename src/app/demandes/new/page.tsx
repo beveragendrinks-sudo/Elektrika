@@ -17,15 +17,9 @@ const FALLBACK_ENTITIES = [
   { entity_id: 'ent-5', code: 'K&Ko', name: 'K&Ko' },
 ];
 
-const FALLBACK_TECHNICIANS = [
-  { technician_id: 'tech-1', name: 'Mohamed Salah' },
-  { technician_id: 'tech-2', name: 'Karim Bejaoui' },
-  { technician_id: 'tech-3', name: 'Anis Trabelsi' },
-];
-
 async function getFormData() {
   try {
-    const [sitesRes, entitiesRes, techniciansRes] = await Promise.all([
+    const [sitesRes, entitiesRes] = await Promise.all([
       supabase
         .from('intervention_sites')
         .select('intervention_site_id, label')
@@ -35,42 +29,35 @@ async function getFormData() {
         .from('group_entities')
         .select('entity_id, code, name')
         .eq('active', true),
-      supabase
-        .from('technicians')
-        .select('technician_id, name')
-        .eq('active', true),
     ]);
 
     return {
       sites: sitesRes.data?.length ? sitesRes.data : FALLBACK_SITES,
       entities: entitiesRes.data?.length ? entitiesRes.data : FALLBACK_ENTITIES,
-      technicians: techniciansRes.data?.length ? techniciansRes.data : FALLBACK_TECHNICIANS,
     };
   } catch {
     // Supabase non configuré — utiliser les données par défaut
     return {
       sites: FALLBACK_SITES,
       entities: FALLBACK_ENTITIES,
-      technicians: FALLBACK_TECHNICIANS,
     };
   }
 }
 
 export default async function NewDemandePage() {
-  const { sites, entities, technicians } = await getFormData();
+  const { sites, entities } = await getFormData();
 
   return (
     <div className="max-w-xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Nouvelle demande d&apos;intervention</h1>
         <p className="text-slate-500 mt-1 text-sm">
-          Le prestataire de service assigné prendra contact avec vous pour la clarification.
+          Un prestataire de service qualifié sera assigné par votre responsable et vous contactera pour la clarification.
         </p>
       </div>
       <NewDemandeForm
         interventionSites={sites}
         entities={entities}
-        technicians={technicians}
       />
     </div>
   );
