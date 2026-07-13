@@ -234,6 +234,40 @@ const BC_STATUS_COLOR: Record<string, string>  = { draft: 'bg-amber-100 text-amb
 
 const SPENDING = { spent: 37200, committed: 6200 };
 
+// ── SLA alertes (calculées depuis les demandes actives) ────────────────────
+const SLA_THRESHOLDS: Partial<Record<string, { warn: number; escalate: number }>> = {
+  clarification:                  { warn: 4,  escalate: 24 },
+  preparation:                    { warn: 24, escalate: 72 },
+  planned:                        { warn: 24, escalate: 72 },
+  completed_pending_confirmation: { warn: 24, escalate: 48 },
+  awaiting_materials:             { warn: 48, escalate: 120 },
+};
+
+interface SlaAlert {
+  title: string;
+  site: string;
+  status: string;
+  hours: number;
+  level: 'warning' | 'escalation';
+}
+
+const DEMANDES_SITE: Array<{ title: string; site: string; status: string; hours_in_status: number }> = [
+  { title: 'Tableau TGS-B2',           site: 'Atelier B',  status: 'clarification',                 hours_in_status: 29 },
+  { title: 'Compresseur C-01',          site: 'Zone C',     status: 'ready_to_plan',                 hours_in_status: 51 },
+  { title: 'Pompe hydraulique P-12',    site: 'Atelier A',  status: 'preparation',                   hours_in_status: 18 },
+  { title: 'Ventilation CTA-2',         site: 'Zone B',     status: 'awaiting_materials',            hours_in_status: 56 },
+  { title: 'Remplacement moteur comp.', site: 'Zone D',     status: 'planned',                       hours_in_status: 8 },
+  { title: 'Câblage armoire AT-04',     site: 'Siège',      status: 'completed_pending_confirmation', hours_in_status: 52 },
+];
+
+const SLA_ALERTS: SlaAlert[] = DEMANDES_SITE.flatMap((d): SlaAlert[] => {
+  const thresh = SLA_THRESHOLDS[d.status];
+  if (!thresh) return [];
+  if (d.hours_in_status >= thresh.escalate) return [{ title: d.title, site: d.site, status: d.status, hours: d.hours_in_status, level: 'escalation' }];
+  if (d.hours_in_status >= thresh.warn) return [{ title: d.title, site: d.site, status: d.status, hours: d.hours_in_status, level: 'warning' }];
+  return [];
+}).sort((a, b) => (b.level === 'escalation' ? 1 : 0) - (a.level === 'escalation' ? 1 : 0));
+
 // ── Budget card ────────────────────────────────────────────────────────────
 function AnnualBudgetCard() {
   const [budget, setBudget]   = useState(60000);
@@ -455,23 +489,26 @@ export default function DirecteurDashboard() {
         />
       </div>
 
-      {/* Alertes en cours */}
-      <SectionTitle>Alertes en cours</SectionTitle>
+      {/* Alertes SLA en cours */}
+      <SectionTitle>Alertes SLA en cours</SectionTitle>
       <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100">
-        {[
-          { title: 'Tableau TGS-B2',    status: 'clarification',  hours: 29, alert: 'low',        site: 'Atelier B' },
-          { title: 'Compresseur C-01',  status: 'ready_to_plan',  hours: 51, alert: 'escalation',  site: 'Zone C' },
-        ].map((a, i) => (
-          <div key={i} className="flex items-center justify-between px-5 py-3">
-            <div>
-              <div className="text-sm font-medium text-slate-900">{a.title}</div>
-              <div className="text-xs text-slate-500">{a.site} · {a.status}</div>
-            </div>
-            <div className={`text-xs font-medium px-2.5 py-1 rounded-full ${a.alert === 'escalation' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
-              {a.hours}h {a.alert === 'escalation' ? '— Escalade' : '— Alerte'}
-            </div>
+        {SLA_ALERTS.length === 0 ? (
+          <div className="px-5 py-4 text-sm text-green-700 bg-green-50 flex items-center gap-2">
+            <span>✓</span> Aucune alerte SLA active — tous les délais sont respectés.
           </div>
-        ))}
+        ) : (
+          SLA_ALERTS.map((a, i) => (
+            <div key={i} className="flex items-center justify-between px-5 py-3">
+              <div>
+                <div className="text-sm font-medium text-slate-900">{a.title}</div>
+                <div className="text-xs text-slate-500">{a.site} · {a.status.replace(/_/g, ' ')}</div>
+              </div>
+              <div className={`text-xs font-medium px-2.5 py-1 rounded-full ${a.level === 'escalation' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
+                {a.hours}h {a.level === 'escalation' ? '— Escalade' : '— Alerte'}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* BCs récents */}

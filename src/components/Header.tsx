@@ -36,6 +36,7 @@ function buildNavLinks(role: string): { href: string; label: string }[] {
     case 'electricien':
       return [
         { href: '/demandes', label: 'Demandes' },
+        { href: '/planning', label: 'Planning' },
         { href: '/ordres-de-travail', label: 'Mes OTs' },
         { href: '/bons-de-commande', label: 'Bons de commande' },
       ];

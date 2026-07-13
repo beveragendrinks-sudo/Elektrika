@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense, useRef, useState } from 'react';
+import { sendBCToFournisseurAction } from '@/app/actions/sendBCToFournisseur';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface BCLine {
@@ -394,7 +395,16 @@ function BCDocument({ bc, docRef }: { bc: BCData; docRef: React.RefObject<HTMLDi
 }
 
 // ── BC Validation Panel ────────────────────────────────────────────────────
-function BCValidationPanel({ bcStatus }: { bcStatus: string }) {
+function BCValidationPanel({
+  bcStatus, poNumber, supplierContact, demandeTitle, entityName, requestId,
+}: {
+  bcStatus: string;
+  poNumber: string;
+  supplierContact: string;
+  demandeTitle: string;
+  entityName: string;
+  requestId?: string;
+}) {
   const [remarques, setRemarques] = useState('');
   const [action, setAction] = useState<'idle' | 'validating' | 'rejecting' | 'validated' | 'rejected'>('idle');
 
@@ -402,11 +412,21 @@ function BCValidationPanel({ bcStatus }: { bcStatus: string }) {
 
   if (action === 'validated') {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-xl px-6 py-5 flex items-center gap-4">
-        <div className="text-3xl">✓</div>
-        <div>
-          <div className="font-bold text-green-800">Bon de commande validé</div>
-          <div className="text-sm text-green-600 mt-0.5">Envoyé au fournisseur pour confirmation.</div>
+      <div className="bg-green-50 border border-green-200 rounded-xl px-6 py-5 space-y-3">
+        <div className="flex items-center gap-4">
+          <div className="text-3xl">✓</div>
+          <div>
+            <div className="font-bold text-green-800">Bon de commande validé</div>
+            <div className="text-sm text-green-600 mt-0.5">Statut mis à jour → <strong>Envoyé</strong></div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 bg-white rounded-lg border border-green-200 px-4 py-2.5">
+          <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <span className="text-xs text-green-700">
+            Email envoyé au fournisseur avec le bon de commande en pièce jointe
+          </span>
         </div>
       </div>
     );
@@ -429,6 +449,15 @@ function BCValidationPanel({ bcStatus }: { bcStatus: string }) {
   async function doAction(type: 'validating' | 'rejecting') {
     setAction(type);
     await new Promise((r) => setTimeout(r, 900));
+    if (type === 'validating') {
+      sendBCToFournisseurAction({
+        poNumber,
+        requestTitle: demandeTitle,
+        contactName: supplierContact,
+        entityName,
+        requestId,
+      }).catch(console.error);
+    }
     setAction(type === 'validating' ? 'validated' : 'rejected');
   }
 
@@ -703,7 +732,14 @@ function BCPageInner({ id }: { id: string }) {
       </div>
 
       <div className="max-w-4xl mx-auto space-y-6">
-        <BCValidationPanel bcStatus={bc.status} />
+        <BCValidationPanel
+          bcStatus={bc.status}
+          poNumber={bc.po_number}
+          supplierContact={bc.supplier.contact}
+          demandeTitle={bc.demande.title}
+          entityName={bc.entity}
+          requestId={bc.demande.id || undefined}
+        />
         <BCDeliveryPanel bcStatus={bc.status} demandeTitle={bc.demande.title} />
         <BCDocument bc={bc} docRef={docRef} />
       </div>

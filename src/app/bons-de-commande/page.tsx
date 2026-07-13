@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 interface BCRow {
   id: string;
@@ -54,8 +55,16 @@ function fmtDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
-export default function BonsDeCommandePage() {
+function BCsInner() {
+  const searchParams = useSearchParams();
   const [filter, setFilter] = useState<Filter>('all');
+
+  useEffect(() => {
+    const f = searchParams.get('filter') as Filter | null;
+    if (f && ['all', 'draft', 'sent', 'confirmed', 'received'].includes(f)) {
+      setFilter(f);
+    }
+  }, [searchParams]);
 
   const counts: Record<string, number> = {
     draft:     MOCK_BCS.filter(b => b.status === 'draft').length,
@@ -177,5 +186,13 @@ export default function BonsDeCommandePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function BonsDeCommandePage() {
+  return (
+    <Suspense fallback={<div className="animate-pulse space-y-4"><div className="h-10 bg-slate-100 rounded-xl" /><div className="h-40 bg-slate-100 rounded-xl" /></div>}>
+      <BCsInner />
+    </Suspense>
   );
 }

@@ -46,6 +46,27 @@ const ENTITIES = [
   },
 ];
 
+// ── SLA escalation data (groupe) ───────────────────────────────────────────
+const SLA_ESCALATE: Partial<Record<string, number>> = {
+  clarification:                  24,
+  preparation:                    72,
+  planned:                        72,
+  completed_pending_confirmation: 48,
+  awaiting_materials:             120,
+};
+
+const GROUP_DEMANDES: Array<{ title: string; entity: string; site: string; status: string; hours_in_status: number }> = [
+  { title: 'Compresseur C-01',         entity: 'FAD',  site: 'Zone C',           status: 'ready_to_plan',                 hours_in_status: 51 },
+  { title: 'TGBT Installation',        entity: 'BTFI', site: 'Sénia',            status: 'awaiting_materials',            hours_in_status: 132 },
+  { title: 'Moteur pompe P-12',        entity: 'FAD',  site: 'Pôle Industriel',  status: 'preparation',                   hours_in_status: 80 },
+  { title: 'Câblage armoire AT-04',    entity: 'LAD',  site: 'Siège Ben Arous',  status: 'completed_pending_confirmation', hours_in_status: 52 },
+];
+
+const SLA_ESCALATIONS = GROUP_DEMANDES.filter(d => {
+  const thresh = SLA_ESCALATE[d.status];
+  return thresh != null && d.hours_in_status >= thresh;
+}).sort((a, b) => b.hours_in_status - a.hours_in_status);
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function oeiColor(v: number)  { return v >= 80 ? 'text-green-600' : v >= 65 ? 'text-amber-600' : 'text-red-600'; }
 function mttrColor(v: number) { return v <= 30 ? 'text-green-600' : v <= 48 ? 'text-amber-600' : 'text-red-600'; }
@@ -451,6 +472,30 @@ export default function DGDashboard() {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Escalades SLA */}
+      <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mt-4 mb-3">Escalades SLA — Groupe</h2>
+      <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+        {SLA_ESCALATIONS.filter(d => filter === 'all' || filter === d.entity).length === 0 ? (
+          <div className="px-5 py-4 text-sm text-green-700 bg-green-50 rounded-xl flex items-center gap-2">
+            <span>✓</span> Aucune escalade SLA active pour {filter === 'all' ? 'le groupe' : filter}.
+          </div>
+        ) : (
+          SLA_ESCALATIONS
+            .filter(d => filter === 'all' || filter === d.entity)
+            .map((d, i) => (
+              <div key={i} className="flex items-center justify-between px-5 py-3">
+                <div>
+                  <div className="text-sm font-medium text-slate-900">{d.title}</div>
+                  <div className="text-xs text-slate-500">{d.entity} · {d.site} · {d.status.replace(/_/g, ' ')}</div>
+                </div>
+                <div className="text-xs font-medium px-2.5 py-1 rounded-full bg-red-100 text-red-600">
+                  {d.hours_in_status}h — Escalade
+                </div>
+              </div>
+            ))
+        )}
       </div>
 
       {/* Points d'attention */}

@@ -5,31 +5,14 @@ import type { RequestStatus, InterventionCategory } from '@/types';
 import Link from 'next/link';
 import FilterBar from '@/components/FilterBar';
 import type { ActiveCategories, ActiveTypes } from '@/components/FilterBar';
+import { WEEK_PLAN, TYPE_LABEL, TYPE_COLOR } from '@/lib/weekPlanData';
+import type { WeekMission, WeekDay } from '@/lib/weekPlanData';
 
 const ELECTRICIAN_NAME = 'Mohamed Salah';
 const CAPACITY_MAX = 10;
 const TODAY_DATE = '02/07';
 
 // ── Types ──────────────────────────────────────────────────────────────────
-interface WeekMission {
-  id: string;
-  ot_id: string;
-  title: string;
-  site: string;
-  type: 1 | 2 | 3;
-  points: 1 | 3 | 5;
-  validated_bcs?: { id: string; po: string }[];
-}
-
-interface WeekDay {
-  key: string;
-  label: string;
-  date: string;
-  isToday?: boolean;
-  isPast?: boolean;
-  missions: WeekMission[];
-}
-
 interface ActiveDemande {
   id: string;
   ot_id?: string;
@@ -44,51 +27,7 @@ interface ActiveDemande {
 }
 
 // ── Mock data ──────────────────────────────────────────────────────────────
-const WEEK_PLAN: WeekDay[] = [
-  {
-    key: 'lun', label: 'Lun', date: '30/06', isPast: true,
-    missions: [
-      { id: '3', ot_id: 'ot-3', title: 'Câblage armoire AT-04', site: 'Siège Ben Arous', type: 3, points: 5 },
-      { id: '6', ot_id: 'ot-6', title: 'Vérif. disj. ligne D', site: 'Siège Ben Arous', type: 1, points: 1 },
-    ],
-  },
-  {
-    key: 'mar', label: 'Mar', date: '01/07', isPast: true,
-    missions: [
-      { id: '1', ot_id: 'ot-1', title: 'Panne tableau TGS-B2', site: 'Siège Ben Arous', type: 1, points: 1 },
-      { id: '7', ot_id: 'ot-7', title: 'Fusible armoire B3', site: 'Siège Ben Arous', type: 1, points: 1 },
-    ],
-  },
-  {
-    key: 'mer', label: 'Mer', date: '02/07', isToday: true,
-    missions: [
-      {
-        id: '4', ot_id: 'ot-4', title: 'Disjoncteur Atelier C', site: 'Pôle Industriel Jbel Oust',
-        type: 1, points: 1,
-        validated_bcs: [{ id: 'bc-2', po: 'BC-LAD-2026-000038' }],
-      },
-      {
-        id: '8', ot_id: 'ot-8', title: 'Vérification tableau BT', site: 'Pôle Industriel Jbel Oust',
-        type: 2, points: 3,
-        validated_bcs: [],
-      },
-    ],
-  },
-  {
-    key: 'jeu', label: 'Jeu', date: '03/07',
-    missions: [
-      {
-        id: '5', ot_id: 'ot-5', title: 'Remplacement variateur V-08', site: 'Megrine',
-        type: 2, points: 3,
-        validated_bcs: [{ id: 'bc-1', po: 'BC-LAD-2026-000041' }],
-      },
-    ],
-  },
-  {
-    key: 'ven', label: 'Ven', date: '04/07',
-    missions: [],
-  },
-];
+// WEEK_PLAN, TYPE_LABEL, TYPE_COLOR are imported from @/lib/weekPlanData
 
 // Categories this prestataire is qualified to handle
 const ALLOWED_CATEGORIES: InterventionCategory[] = ['electricite'];
@@ -124,17 +63,6 @@ const STATUS_COLOR: Partial<Record<RequestStatus, string>> = {
   completed_pending_confirmation: 'bg-teal-100 text-teal-700',
 };
 
-const TYPE_COLOR: Record<1 | 2 | 3, string> = {
-  1: 'bg-green-100 text-green-700',
-  2: 'bg-blue-100 text-blue-700',
-  3: 'bg-violet-100 text-violet-700',
-};
-
-const TYPE_LABEL: Record<1 | 2 | 3, string> = {
-  1: 'Panne simple',
-  2: 'Réparation',
-  3: 'Travaux',
-};
 
 function capacityColor(pct: number) {
   if (pct >= 90) return { bar: 'bg-red-400', text: 'text-red-600' };
@@ -365,7 +293,7 @@ function DayCard({ day }: { day: WeekDay }) {
         day.isToday ? 'bg-slate-900' : day.isPast ? 'bg-slate-100' : 'bg-white border-b border-slate-100'
       }`}>
         <div className="flex items-baseline gap-1.5">
-          <span className={`text-sm font-bold ${day.isToday ? 'text-white' : 'text-slate-700'}`}>{day.label}</span>
+          <span className={`text-sm font-bold ${day.isToday ? 'text-white' : 'text-slate-700'}`}>{day.shortLabel}</span>
           <span className={`text-xs ${day.isToday ? 'text-slate-300' : 'text-slate-400'}`}>{day.date}</span>
         </div>
         <div className="flex items-center gap-1.5">
