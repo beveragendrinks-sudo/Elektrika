@@ -37,7 +37,7 @@ export default function DemandeurDashboard() {
     ), [histoCat]);
 
   const criticalCount = BASE.filter(i => i.isCritical && ACTIVE_STATUSES.includes(i.status)).length;
-  const toConfirm = BASE.filter(i => i.status === 'a_confirmer').length;
+  const toConfirm = BASE.filter(i => i.status === 'a_valider').length;
 
   return (
     <div className="px-4 sm:px-6 py-4 pb-28 lg:pb-8 max-w-7xl mx-auto space-y-6">
@@ -95,7 +95,7 @@ export default function DemandeurDashboard() {
       {/* ── Kanban ─────────────────────────────────────────────────── */}
       <section>
         <SectionTitle>Tableau des demandes</SectionTitle>
-        <KanbanBoard interventions={active} defaultColumn="confirm" />
+        <KanbanBoard interventions={active} defaultColumn="soumise" />
       </section>
 
       {/* ── 2-week planning ────────────────────────────────────────── */}

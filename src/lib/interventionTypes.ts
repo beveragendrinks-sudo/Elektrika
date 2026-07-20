@@ -50,12 +50,6 @@ export const INTERVENTION_NATURES: InterventionNatureOption[] = [
     description: 'Création ou extension d\'installations',
     points: 3,
   },
-  {
-    id: 'conformite',
-    label: 'Mise en conformité',
-    description: 'Travaux pour respecter des exigences réglementaires ou normes internes',
-    points: 3,
-  },
 ];
 
 export function getCategoryById(id: string): InterventionCategoryOption | undefined {

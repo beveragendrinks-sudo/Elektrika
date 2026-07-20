@@ -71,8 +71,7 @@ export default function DirecteurDashboard() {
   }, [filterEntity]);
 
   const criticalCount = entityBase.filter(i => i.isCritical && ACTIVE_STATUSES.includes(i.status)).length;
-  const toConfirm     = entityBase.filter(i => i.status === 'a_confirmer').length;
-  const toValidate    = entityBase.filter(i => i.status === 'en_attente').length;
+  const toValidate    = entityBase.filter(i => i.status === 'a_valider').length;
   const inProgress    = entityBase.filter(i => i.status === 'en_cours').length;
   const budgetRemain  = budget.allocated - budget.consumed - budget.committed;
   const budgetPct     = Math.round((budget.consumed / budget.allocated) * 100);
@@ -101,13 +100,8 @@ export default function DirecteurDashboard() {
               <span className="font-bold text-slate-900">{entityBase.filter(i => ACTIVE_STATUSES.includes(i.status)).length}</span> actives
             </span>
             {toValidate > 0 && (
-              <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-                ✓ {toValidate} à valider
-              </span>
-            )}
-            {toConfirm > 0 && (
               <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                ⏳ {toConfirm} à confirmer
+                ⏳ {toValidate} à valider
               </span>
             )}
             {criticalCount > 0 && (
@@ -176,8 +170,8 @@ export default function DirecteurDashboard() {
         <SectionTitle>KPIs &amp; Budget</SectionTitle>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <KpiCard label="En cours"        value={inProgress}    color="bg-blue-50 border-blue-100"   valueColor="text-blue-700"  />
-          <KpiCard label="À confirmer"     value={toConfirm}     color="bg-amber-50 border-amber-100" valueColor="text-amber-700" />
-          <KpiCard label="Terminées (mois)"value={entityBase.filter(i => i.status === 'termine').length} color="bg-green-50 border-green-100" valueColor="text-green-700" />
+          <KpiCard label="À valider"       value={toValidate}    color="bg-amber-50 border-amber-100" valueColor="text-amber-700" />
+          <KpiCard label="Terminées (mois)"value={entityBase.filter(i => i.status === 'terminee').length} color="bg-green-50 border-green-100" valueColor="text-green-700" />
           <KpiCard label="Actives totales" value={entityBase.filter(i => ACTIVE_STATUSES.includes(i.status)).length} color="bg-slate-50 border-slate-100" valueColor="text-slate-700" />
         </div>
 

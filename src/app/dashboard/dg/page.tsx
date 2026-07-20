@@ -33,7 +33,7 @@ const KPI_GROUP = {
   mttr: 2.4,
   totalActive: MOCK_INTERVENTIONS.filter(i => ACTIVE_STATUSES.includes(i.status)).length,
   criticals: MOCK_INTERVENTIONS.filter(i => i.isCritical && ACTIVE_STATUSES.includes(i.status)).length,
-  done: MOCK_INTERVENTIONS.filter(i => i.status === 'termine').length,
+  done: MOCK_INTERVENTIONS.filter(i => i.status === 'terminee').length,
 };
 
 export default function DGDashboard() {

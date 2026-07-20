@@ -25,7 +25,7 @@ function getNavItems(role: Role): NavItem[] {
     return [
       { href: '/demandes/new',                label: 'Nouvelle demande',      shortLabel: 'Demande',     icon: '+',  style: 'primary'   },
       { href: '/demandes',                    label: 'Mes demandes',          shortLabel: 'Demandes',    icon: '≡',  style: 'secondary' },
-      { href: '/demandes?status=termine',     label: 'Historique',            shortLabel: 'Historique',  icon: '🕐', style: 'outline'   },
+      { href: '/demandes?status=terminee',     label: 'Historique',            shortLabel: 'Historique',  icon: '🕐', style: 'outline'   },
     ];
   }
 
@@ -34,7 +34,7 @@ function getNavItems(role: Role): NavItem[] {
       { href: '/planning?view=today',         label: 'Travaux du jour',       shortLabel: "Aujourd'hui", icon: '📋', style: 'primary'   },
       { href: '/planning',                    label: 'Planning hebdomadaire', shortLabel: 'Planning',    icon: '📅', style: 'secondary' },
       { href: '/demandes',                    label: 'Tableau des demandes',  shortLabel: 'Demandes',    icon: '≡',  style: 'outline'   },
-      { href: '/demandes?status=termine',     label: 'Historique',            shortLabel: 'Historique',  icon: '🕐', style: 'outline'   },
+      { href: '/demandes?status=terminee',     label: 'Historique',            shortLabel: 'Historique',  icon: '🕐', style: 'outline'   },
       { href: '/kpi',                         label: 'Performance',           shortLabel: 'Performance', icon: '📊', style: 'outline'   },
     ];
   }
@@ -44,7 +44,7 @@ function getNavItems(role: Role): NavItem[] {
     { href: '/demandes',                    label: 'Tableau des demandes',  shortLabel: 'Demandes',    icon: '≡',  style: 'primary'   },
     { href: '/kpi',                         label: 'Performance',           shortLabel: 'Performance', icon: '📊', style: 'secondary' },
     { href: '/bons-de-commande',            label: 'Bons de commande',      shortLabel: 'BC',          icon: '📋', style: 'outline'   },
-    { href: '/demandes?status=termine',     label: 'Historique',            shortLabel: 'Historique',  icon: '🕐', style: 'outline'   },
+    { href: '/demandes?status=terminee',     label: 'Historique',            shortLabel: 'Historique',  icon: '🕐', style: 'outline'   },
   ];
 }
 

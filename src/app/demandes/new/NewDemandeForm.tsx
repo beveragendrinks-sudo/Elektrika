@@ -214,7 +214,7 @@ export default function NewDemandeForm({ interventionSites, entities, userRole =
 
     try {
       const needsValidation = form.safety_risk || form.production_stop;
-      const initialStatus = needsValidation ? 'en_attente' : 'nouveau';
+      const initialStatus = 'soumise'; // toutes les demandes démarrent en "soumise"
 
       const priorityScore = computePriorityScore({
         safetyRisk: form.safety_risk,

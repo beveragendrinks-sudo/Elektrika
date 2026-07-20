@@ -80,7 +80,7 @@ export function HistoryRow({
 
   const statusBadge = (
     <span className={`text-xs font-medium px-2 py-1 rounded-lg ${
-      item.status === 'termine' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+      item.status === 'terminee' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
     }`}>
       {STATUS_LABEL[item.status]}
     </span>

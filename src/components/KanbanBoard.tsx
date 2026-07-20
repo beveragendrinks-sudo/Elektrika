@@ -15,13 +15,11 @@ interface Column {
 }
 
 const COLUMNS: Column[] = [
-  { id: 'new',     label: 'Nouvelles',       statuses: ['nouveau'],        colBg: 'bg-slate-100',  headerText: 'text-slate-700',  dot: 'bg-slate-400'  },
-  { id: 'wait',    label: 'En attente',      statuses: ['en_attente'],     colBg: 'bg-amber-50',   headerText: 'text-amber-700',  dot: 'bg-amber-500'  },
-  { id: 'offre',   label: "Appel d'offres",  statuses: ['appel_offre'],    colBg: 'bg-orange-50',  headerText: 'text-orange-700', dot: 'bg-orange-500' },
-  { id: 'prep',    label: 'En préparation',  statuses: ['en_preparation'], colBg: 'bg-blue-50',    headerText: 'text-blue-700',   dot: 'bg-blue-500'   },
-  { id: 'planned', label: 'Planifiées',      statuses: ['planifie'],       colBg: 'bg-indigo-50',  headerText: 'text-indigo-700', dot: 'bg-indigo-500' },
-  { id: 'inprog',  label: 'En cours',        statuses: ['en_cours'],       colBg: 'bg-teal-50',    headerText: 'text-teal-700',   dot: 'bg-teal-500'   },
-  { id: 'confirm', label: 'À confirmer',     statuses: ['a_confirmer'],    colBg: 'bg-green-50',   headerText: 'text-green-700',  dot: 'bg-green-500'  },
+  { id: 'soumise',  label: 'Soumises',        statuses: ['soumise'],      colBg: 'bg-slate-100',  headerText: 'text-slate-700',  dot: 'bg-slate-400'  },
+  { id: 'offre',    label: "Appel d'offres",  statuses: ['appel_offre'],  colBg: 'bg-orange-50',  headerText: 'text-orange-700', dot: 'bg-orange-500' },
+  { id: 'planifie', label: 'Planifiées',      statuses: ['planifiee'],    colBg: 'bg-blue-50',    headerText: 'text-blue-700',   dot: 'bg-blue-500'   },
+  { id: 'inprog',   label: 'En cours',        statuses: ['en_cours'],     colBg: 'bg-teal-50',    headerText: 'text-teal-700',   dot: 'bg-teal-500'   },
+  { id: 'valider',  label: 'À valider',       statuses: ['a_valider'],    colBg: 'bg-green-50',   headerText: 'text-green-700',  dot: 'bg-green-500'  },
 ];
 
 interface KanbanBoardProps {
@@ -79,7 +77,7 @@ export default function KanbanBoard({ interventions, defaultColumn = 'inprog' }:
       {/* ── Mobile: single column cards ─────────────────────────── */}
       <div className="lg:hidden mt-3 space-y-2">
         {(() => {
-          const col = COLUMNS.find(c => c.id === activeCol)!;
+          const col = COLUMNS.find(c => c.id === activeCol) ?? COLUMNS[0];
           const items = colItems(col);
           if (items.length === 0) {
             return (

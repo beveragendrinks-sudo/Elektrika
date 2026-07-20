@@ -35,11 +35,10 @@ function nextWorkingDay(): string {
 
 // ── SLA thresholds (heures dans le statut) ─────────────────────────────────
 const SLA_THRESHOLDS: Partial<Record<string, { warn: number; escalate: number }>> = {
-  en_attente:     { warn: 8,  escalate: 24 },
-  appel_offre:    { warn: 48, escalate: 96 },
-  en_preparation: { warn: 24, escalate: 72 },
-  planifie:       { warn: 24, escalate: 72 },
-  a_confirmer:    { warn: 24, escalate: 48 },
+  soumise:     { warn: 8,  escalate: 24 },
+  appel_offre: { warn: 48, escalate: 96 },
+  planifiee:   { warn: 24, escalate: 72 },
+  a_valider:   { warn: 24, escalate: 48 },
 };
 
 // ── Planning + SLA job ─────────────────────────────────────────────────────
@@ -53,11 +52,11 @@ export async function runDailyPlanningJob(): Promise<void> {
 }
 
 async function planReadyDemandes(): Promise<void> {
-  // 'en_preparation' items where prestataire is assigned and planning can proceed
+  // 'planifiee' items where prestataire is assigned and mission can be created
   const { data: requests, error } = await supabase
     .from('maintenance_requests')
     .select('request_id, site_id, assigned_technician_id, requested_by, issuing_entity_id, type, points')
-    .eq('status', 'en_preparation')
+    .eq('status', 'planifiee')
     .not('assigned_technician_id', 'is', null);
 
   if (error) {
@@ -303,7 +302,7 @@ async function checkConfirmationsPending(): Promise<void> {
   const { data: requests, error } = await supabase
     .from('maintenance_requests')
     .select('request_id, status_changed_at, requested_by')
-    .eq('status', 'a_confirmer');
+    .eq('status', 'a_valider');
 
   if (error || !requests) return;
 
@@ -321,7 +320,7 @@ async function checkConfirmationsPending(): Promise<void> {
         .select('notification_id')
         .eq('request_id', req.request_id)
         .eq('level', 'low')
-        .eq('status_at_trigger', 'a_confirmer')
+        .eq('status_at_trigger', 'a_valider')
         .gte('created_at', dedupeWindow)
         .limit(1);
       if (dup && dup.length > 0) continue;
@@ -335,7 +334,7 @@ async function checkConfirmationsPending(): Promise<void> {
         message: `Votre intervention est terminée. Merci de confirmer : ${APP_URL}/demandes/${req.request_id}`,
         email_subject: email.subject,
         email_html: email.html,
-        status_at_trigger: 'a_confirmer',
+        status_at_trigger: 'a_valider',
         hours_in_status: hoursWaiting,
       });
 

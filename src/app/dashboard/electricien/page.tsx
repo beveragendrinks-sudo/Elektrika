@@ -43,7 +43,7 @@ export default function ElectricienDashboard() {
       (histoCat === 'all' || i.category === histoCat),
     ), [histoCat]);
 
-  const toConfirm = BASE.filter(i => i.status === 'a_confirmer').length;
+  const toConfirm = BASE.filter(i => i.status === 'a_valider').length;
   const criticalCount = BASE.filter(i => i.isCritical && ACTIVE_STATUSES.includes(i.status)).length;
   const todayItems = BASE.filter(i => i.plannedDate === '2026-07-16' && ACTIVE_STATUSES.includes(i.status));
 

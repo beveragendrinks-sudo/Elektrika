@@ -4,27 +4,40 @@
 // (défense en profondeur : à valider aussi côté client mobile offline)
 // ============================================================
 
-import type { RequestStatus } from '@/types';
+import type { RequestStatus, AppelOffreSousStatut } from '@/types';
 
 export const STATUS_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
-  nouveau:        ['en_attente', 'appel_offre', 'annule'],
-  en_attente:     ['appel_offre', 'en_preparation', 'annule'],
-  appel_offre:    ['en_preparation', 'annule'],
-  en_preparation: ['planifie', 'annule'],
-  planifie:       ['en_cours', 'annule'],
-  en_cours:       ['a_confirmer', 'annule'],
-  a_confirmer:    ['termine'],
+  soumise:     ['appel_offre', 'planifiee', 'annulee'],
+  appel_offre: ['planifiee', 'annulee'],
+  planifiee:   ['en_cours', 'annulee'],
+  en_cours:    ['a_valider', 'annulee'],
+  a_valider:   ['terminee'],
   // pas d'annulation possible après travaux terminés : un refus du demandeur
   // se traite via une 2ème intervention liée (parent_request_id), jamais en
   // rouvrant ou en annulant cette fiche — voir createSecondIntervention()
-  annule:         [],
-  termine:        [],
+  terminee:    [],
+  annulee:     [],
 };
+
+/**
+ * Dérive le sous-statut de la phase "Appel d'offres" depuis les compteurs devis.
+ * Non stocké en BDD — calculé à la volée dans l'UI.
+ */
+export function getAppelOffreSousStatut(
+  devisEnvoyes: number,
+  devisRecus: number,
+): AppelOffreSousStatut {
+  if (devisEnvoyes === 0) return 'sans_contact';
+  if (devisRecus < 2)     return 'en_attente_reponses';
+  return 'comparatif_pret';
+}
 
 export interface MaintenanceRequestLike {
   status: RequestStatus;
   safety_risk: boolean;
   production_stop: boolean;
+  /** Garde de sécurité/arrêt-prod : la transition soumise→planifiee/appel_offre
+   *  nécessite management_approved = true quand safety_risk ou production_stop */
   management_approved: boolean | null;
   submitted_at: string | null;
 }
@@ -57,9 +70,11 @@ export function canTransition(
     };
   }
 
+  // Garde sécurité/arrêt-prod : la demande doit être approuvée avant de quitter "soumise"
   if (
-    request.status === 'en_attente' &&
-    nextStatus !== 'annule' &&
+    request.status === 'soumise' &&
+    nextStatus !== 'annulee' &&
+    requiresManagementValidation(request) &&
     request.management_approved !== true
   ) {
     return {
@@ -68,7 +83,7 @@ export function canTransition(
     };
   }
 
-  if (nextStatus === 'annule' && (!transitionReason || transitionReason.trim().length === 0)) {
+  if (nextStatus === 'annulee' && (!transitionReason || transitionReason.trim().length === 0)) {
     return {
       allowed: false,
       reason: 'Un motif est obligatoire pour annuler une demande',
@@ -136,7 +151,7 @@ export function buildSecondInterventionPayload(
       required_skill_id: originalRequest.required_skill_id,
       issuing_entity_id: originalRequest.issuing_entity_id,
       parent_request_id: originalRequest.request_id,
-      status: 'en_preparation' as RequestStatus, // repart directement en préparation
+      status: 'planifiee' as RequestStatus, // repart directement en planification
     },
     originalRequestUpdate: {
       // à appliquer sur la fiche d'origine, pour tracer le motif de refus
@@ -179,10 +194,10 @@ export function pointsForType(type: 1 | 2 | 3): 1 | 3 | 5 {
  * Miroir côté app du trigger SQL trg_enforce_po_creation_status.
  */
 export function canGeneratePurchaseOrder(status: RequestStatus): TransitionResult {
-  if (status !== 'en_preparation') {
+  if (status !== 'planifiee') {
     return {
       allowed: false,
-      reason: `Le bon de commande ne peut être créé qu'au statut "en préparation" (statut actuel : ${status})`,
+      reason: `Le bon de commande ne peut être créé qu'au statut "Planifiée" (statut actuel : ${status})`,
     };
   }
   return { allowed: true };

@@ -77,7 +77,7 @@ export default function ClotureSection({ otId, status }: ClotureSectionProps) {
     setSubmitting(false);
   }
 
-  if (status && status !== 'planifie' && status !== 'en_cours') return null;
+  if (status && status !== 'planifiee' && status !== 'en_cours') return null;
 
   if (done) {
     return (

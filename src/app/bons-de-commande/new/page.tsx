@@ -18,9 +18,9 @@ interface Props {
 export default function NewBCPage({ searchParams }: Props) {
   const initialRequestId = searchParams.request_id ?? '';
 
-  // Demandes en préparation — en prod: filtrées par l'entité et les assignations de l'utilisateur courant
+  // Demandes planifiées sans prestataire encore assigné — en prod: filtrées par l'entité et les assignations de l'utilisateur courant
   const demandesEnPrep: DemandeOption[] = MOCK_INTERVENTIONS
-    .filter(i => i.status === 'en_preparation')
+    .filter(i => i.status === 'planifiee')
     .map(i => ({
       id:       i.id,
       ref:      i.ref,

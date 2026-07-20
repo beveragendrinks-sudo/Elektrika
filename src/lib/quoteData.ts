@@ -135,6 +135,51 @@ export const MOCK_QUOTE_REQUESTS: QuoteRequest[] = [
     amount: 5200, currency: 'TND', fileSource: 'camera', status: 'rejected',
   },
 
+  // ── Devis fournisseurs / matières premières ─────────────────────────────────
+
+  // bc-1 : LAD électricité — Panne disjoncteur local technique (interventionId 'd1')
+  {
+    id: 'qf-01', interventionId: 'd1', interventionRef: 'DEM-2026-041', bcId: 'bc-1',
+    vendorId: 'vf-1', vendorName: 'Maghreb Electric', vendorEmail: 'info@maghreb-electric.tn',
+    sentAt: '2026-07-12T10:00:00Z', receivedAt: '2026-07-14T09:00:00Z',
+    amount: 742.500, currency: 'TND', fileSource: 'email', status: 'selected',
+    notes: 'Variateur ABB + câble + connecteurs — devis retenu',
+  },
+  {
+    id: 'qf-02', interventionId: 'd1', interventionRef: 'DEM-2026-041', bcId: 'bc-1',
+    vendorId: 'vf-2', vendorName: 'SONELEC Tunisie', vendorEmail: 'contact@sonelec.tn',
+    sentAt: '2026-07-12T10:00:00Z', currency: 'TND', status: 'sent',
+  },
+
+  // bc-3 : FAD plomberie — Pompe hydraulique P-12 (interventionId 'd7')
+  {
+    id: 'qf-03', interventionId: 'd7', interventionRef: 'DEM-2026-044', bcId: 'bc-3',
+    vendorId: 'vf-3', vendorName: 'Robinetterie Tunisie', vendorEmail: 'vente@robin-tn.com',
+    sentAt: '2026-06-30T08:00:00Z', receivedAt: '2026-07-02T10:00:00Z',
+    amount: 1380.000, currency: 'TND', fileSource: 'email', status: 'selected',
+    notes: 'Pompe 18cc/tr + joints + huile HM46',
+  },
+  {
+    id: 'qf-04', interventionId: 'd7', interventionRef: 'DEM-2026-044', bcId: 'bc-3',
+    vendorId: 'vf-4', vendorName: 'Sanitaire Plus SARL', vendorEmail: 'contact@sanitaire-plus.tn',
+    sentAt: '2026-06-30T08:00:00Z', receivedAt: '2026-07-03T14:00:00Z',
+    amount: 1620.000, currency: 'TND', fileSource: 'upload', status: 'rejected',
+  },
+
+  // bc-6 : LAD peinture — Couloir administratif bâtiment A (interventionId '12')
+  {
+    id: 'qf-05', interventionId: '12', interventionRef: 'DEM-2026-029', bcId: 'bc-6',
+    vendorId: 'vf-7', vendorName: 'Matériaux BTP Tunis', vendorEmail: 'contact@mat-btp.tn',
+    sentAt: '2026-07-08T09:00:00Z', receivedAt: '2026-07-10T11:00:00Z',
+    amount: 414.000, currency: 'TND', fileSource: 'email', status: 'selected',
+    notes: 'Enduit + peinture lessivable + papier de verre',
+  },
+  {
+    id: 'qf-06', interventionId: '12', interventionRef: 'DEM-2026-029', bcId: 'bc-6',
+    vendorId: 'vf-8', vendorName: 'Leroy Merlin Pro TN', vendorEmail: 'pro@leroymerlin.tn',
+    sentAt: '2026-07-08T09:00:00Z', currency: 'TND', status: 'sent',
+  },
+
   // ── Intervention 6 : DEM-2026-049 — Fissures mur parking (maçonnerie)
   {
     id: 'q-09', interventionId: '6', interventionRef: 'DEM-2026-049',
@@ -160,7 +205,11 @@ export function getVendorsForCategory(
 }
 
 export function getQuotesForIntervention(interventionId: string): QuoteRequest[] {
-  return MOCK_QUOTE_REQUESTS.filter(q => q.interventionId === interventionId);
+  return MOCK_QUOTE_REQUESTS.filter(q => q.interventionId === interventionId && !q.bcId);
+}
+
+export function getQuotesForBCs(bcIds: string[]): QuoteRequest[] {
+  return MOCK_QUOTE_REQUESTS.filter(q => q.bcId && bcIds.includes(q.bcId));
 }
 
 export function countReceivedQuotes(interventionId: string): number {

@@ -28,7 +28,7 @@ export default function TwoWeekCalendar({ interventions }: { interventions: Inte
   const days = buildDays();
 
   const planned = interventions.filter(
-    i => (i.status === 'planifie' || i.status === 'en_cours') && i.plannedDate,
+    i => (i.status === 'planifiee' || i.status === 'en_cours') && i.plannedDate,
   );
 
   function itemsForDay(date: string) {

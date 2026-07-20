@@ -33,7 +33,7 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
 
 function DemandesContent() {
   const searchParams   = useSearchParams();
-  const showHistory    = searchParams.get('status') === 'termine';
+  const showHistory    = searchParams.get('status') === 'terminee';
 
   const [userRole, setUserRole]         = useState<string>('');
   const [filterEntity, setFilterEntity] = useState<string>('all');
@@ -171,7 +171,7 @@ function DemandesContent() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link
-            href="/demandes?status=termine"
+            href="/demandes?status=terminee"
             className="text-sm text-slate-500 border border-slate-200 px-3 py-2 rounded-xl hover:border-slate-400 transition-colors"
           >
             🕐 Historique

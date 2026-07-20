@@ -10,19 +10,17 @@ import { useMemo } from 'react';
 import type { RequestStatus } from '@/types';
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
-  nouveau:        'Nouvelle',
-  en_attente:     'En attente',
-  appel_offre:    "Appel d'offres",
-  en_preparation: 'En préparation',
-  planifie:       'Planifiée',
-  en_cours:       "En cours",
-  a_confirmer:    'À confirmer',
-  termine:        'Terminée',
-  annule:         'Annulée',
+  soumise:     'Soumise',
+  appel_offre: "Appel d'offres",
+  planifiee:   'Planifiée',
+  en_cours:    'En cours',
+  a_valider:   'À valider',
+  terminee:    'Terminée',
+  annulee:     'Annulée',
 };
 
 const STATUS_ORDER: RequestStatus[] = [
-  'nouveau', 'en_attente', 'appel_offre', 'en_preparation', 'planifie', 'en_cours', 'a_confirmer', 'termine',
+  'soumise', 'appel_offre', 'planifiee', 'en_cours', 'a_valider', 'terminee',
 ];
 
 export interface TimelineStep {

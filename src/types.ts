@@ -3,15 +3,19 @@
 // ============================================================
 
 export type RequestStatus =
-  | 'nouveau'           // 1. Nouvelle demande créée, non encore traitée
-  | 'en_attente'        // 2. En attente de validation direction (risque sécurité / arrêt prod)
-  | 'appel_offre'       // 3. Appel d'offres en cours — devis sollicités auprès des prestataires agréés
-  | 'en_preparation'    // 4. Devis reçus (≥2), prestataire sélectionné, préparation en cours
-  | 'planifie'          // 5. Date d'intervention fixée
-  | 'en_cours'          // 6. Intervention en cours d'exécution
-  | 'a_confirmer'       // 7. Travaux terminés, attente confirmation demandeur
-  | 'termine'           // 8. Clôturée et acceptée (terminal)
-  | 'annule';           // 9. Annulée (terminal)
+  | 'soumise'       // 1. Demande soumise, en attente de prise en charge direction (ex : nouveau + en_attente)
+  | 'appel_offre'   // 2. Appel d'offres en cours — devis sollicités auprès des prestataires agréés (Parcours B)
+  | 'planifiee'     // 3. Ressource assignée, date fixée (ex : en_preparation + planifie)
+  | 'en_cours'      // 4. Intervention en cours d'exécution
+  | 'a_valider'     // 5. Travaux terminés, attente confirmation demandeur (ex : a_confirmer)
+  | 'terminee'      // 6. Clôturée et acceptée (terminal)
+  | 'annulee';      // 7. Annulée (terminal)
+
+/** Sous-statut dérivé à la volée depuis les enregistrements devis — non stocké en BDD */
+export type AppelOffreSousStatut =
+  | 'sans_contact'        // 0 demandes de devis envoyées
+  | 'en_attente_reponses' // ≥1 envoyées, < 2 reçues
+  | 'comparatif_pret';    // ≥2 reçues, comparatif disponible, prêt à sélectionner
 
 export type UserRole = 'admin' | 'directeur_general' | 'directeur_de_site' | 'electricien' | 'demandeur';
 
@@ -28,13 +32,12 @@ export type InterventionCategory =
   | 'menuiserie'
   | 'autres';
 
-/** 5 natures d'intervention */
+/** 4 natures d'intervention */
 export type InterventionNature =
   | 'corrective'
   | 'preventive'
   | 'amelioration'
-  | 'travaux_neufs'
-  | 'conformite';
+  | 'travaux_neufs';
 
 export interface Site {
   site_id: string;
