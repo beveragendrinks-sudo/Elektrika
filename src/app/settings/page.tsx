@@ -18,6 +18,7 @@ interface EntityDetail {
 interface AppUser {
   id: string; name: string; email: string; role: UserRoleType;
   entity: string; site: string; active: boolean; last_login?: string;
+  telegram_chat_id?: string;
 }
 
 interface GroupKpiTargets {
@@ -489,6 +490,9 @@ function UserRow({ user, sites, onSave, onToggle }: {
   const [saved, setSaved]     = useState(false);
   const [pwdSent, setPwdSent] = useState(false);
   const [pwdLoading, setPwdLoading] = useState(false);
+  const [tgChatId, setTgChatId]   = useState(user.telegram_chat_id ?? '');
+  const [tgStatus, setTgStatus]   = useState<'idle' | 'linking' | 'ok' | 'err'>('idle');
+  const [tgErrMsg, setTgErrMsg]   = useState('');
 
   const ADMIN_EMAIL = 'admin@elektrika.tn';
 
@@ -499,6 +503,42 @@ function UserRow({ user, sites, onSave, onToggle }: {
   function handleSave() {
     onSave(draft); setSaved(true);
     setTimeout(() => { setSaved(false); setOpen(false); }, 1200);
+  }
+
+  async function handleTgLink() {
+    if (!tgChatId.trim()) return;
+    setTgStatus('linking'); setTgErrMsg('');
+    try {
+      const res = await fetch('/api/telegram/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, chatId: tgChatId.trim() }),
+      });
+      if (res.ok) {
+        setTgStatus('ok');
+        onSave({ ...user, telegram_chat_id: tgChatId.trim() });
+        setTimeout(() => setTgStatus('idle'), 4000);
+      } else {
+        const err = await res.json() as { error?: string };
+        setTgErrMsg(err.error ?? 'Erreur inconnue');
+        setTgStatus('err');
+      }
+    } catch {
+      setTgErrMsg('Erreur réseau');
+      setTgStatus('err');
+    }
+  }
+
+  async function handleTgUnlink() {
+    setTgStatus('linking');
+    await fetch('/api/telegram/link', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, chatId: tgChatId }),
+    });
+    setTgChatId('');
+    onSave({ ...user, telegram_chat_id: undefined });
+    setTgStatus('idle');
   }
   async function handleResetPwd() {
     setPwdLoading(true);
@@ -597,6 +637,52 @@ function UserRow({ user, sites, onSave, onToggle }: {
               </button>
             )}
           </div>
+          {/* Telegram */}
+          <div className="border-t border-slate-200 pt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">Notifications Telegram</div>
+              {user.telegram_chat_id && (
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">✓ Lié</span>
+              )}
+            </div>
+            <div className="text-xs text-slate-500 mb-3">
+              L&apos;utilisateur doit ouvrir <strong>@ElektrikaFM_bot</strong> sur Telegram et taper <code className="bg-slate-100 px-1 rounded">/start</code> pour obtenir son Chat ID.
+            </div>
+            {user.telegram_chat_id ? (
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs bg-slate-100 px-3 py-2 rounded-lg text-slate-700 font-mono">{user.telegram_chat_id}</code>
+                <button onClick={handleTgUnlink} disabled={tgStatus === 'linking'}
+                  className="text-xs px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
+                  Délier
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text" placeholder="Ex: 847291034"
+                    value={tgChatId}
+                    onChange={e => { setTgChatId(e.target.value); setTgStatus('idle'); }}
+                    className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono"
+                  />
+                  <button onClick={handleTgLink} disabled={!tgChatId.trim() || tgStatus === 'linking'}
+                    className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                      tgStatus === 'ok' ? 'bg-green-600 text-white'
+                      : tgStatus === 'linking' ? 'bg-slate-300 text-slate-500 cursor-wait'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40'
+                    }`}>
+                    {tgStatus === 'linking' ? '⏳…' : tgStatus === 'ok' ? '✓ Lié !' : 'Lier le compte'}
+                  </button>
+                </div>
+                {tgStatus === 'err' && (
+                  <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    ✗ {tgErrMsg}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {user.last_login && <div className="text-xs text-slate-400 pt-1">Dernière connexion : {user.last_login}</div>}
         </div>
       )}

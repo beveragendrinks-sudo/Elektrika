@@ -8,6 +8,19 @@ import {
   emailConfirmationRequise,
   emailBCValidationRequise,
 } from './emailTemplates';
+import { sendTelegramMulti, tg } from './telegram';
+
+// Récupère les chat_ids Telegram des utilisateurs par rôle (en prod : requête Supabase)
+async function getTelegramChatIds(role: 'directeur_general' | 'directeur_de_site' | 'electricien' | 'demandeur', entityId?: string): Promise<string[]> {
+  const query = supabase
+    .from('users')
+    .select('telegram_chat_id')
+    .eq('role', role)
+    .not('telegram_chat_id', 'is', null);
+  if (entityId) query.eq('entity_id', entityId);
+  const { data } = await query;
+  return (data ?? []).map((u: { telegram_chat_id: string }) => u.telegram_chat_id).filter(Boolean);
+}
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
@@ -130,6 +143,14 @@ async function planReadyDemandes(): Promise<void> {
       hours_in_status: 0,
     });
 
+    // Telegram — prestataire + demandeur
+    const [techChats, demChats] = await Promise.all([
+      getTelegramChatIds('electricien', req.issuing_entity_id),
+      getTelegramChatIds('demandeur', req.issuing_entity_id),
+    ]);
+    await sendTelegramMulti(techChats, tg.missionPlanifiee(req.request_id.slice(0, 12), '', missionDate));
+    await sendTelegramMulti(demChats,  tg.demandeAcceptee(req.request_id.slice(0, 12), '', missionDate));
+
     planned++;
   }
 
@@ -194,6 +215,14 @@ async function checkSlaAlerts(): Promise<void> {
         hours_in_status: hoursInStatus,
       });
 
+      // Telegram — DG + directeur d'entité
+      const [dgChats, dirChats] = await Promise.all([
+        getTelegramChatIds('directeur_general'),
+        getTelegramChatIds('directeur_de_site', req.issuing_entity_id),
+      ]);
+      const tgMsg = tg.escaladeSLA(req.request_id.slice(0, 12), '', hoursInStatus, req.status);
+      await sendTelegramMulti([...dgChats, ...dirChats], tgMsg);
+
     } else if (hoursInStatus >= thresholds.warn && req.assigned_technician_id) {
       // Rappel prestataire
       const emailRappel = emailRappelPrestataire(req.request_id, hoursInStatus);
@@ -208,6 +237,10 @@ async function checkSlaAlerts(): Promise<void> {
         status_at_trigger: req.status,
         hours_in_status: hoursInStatus,
       });
+
+      // Telegram — prestataire assigné
+      const techChats = await getTelegramChatIds('electricien', req.issuing_entity_id);
+      await sendTelegramMulti(techChats, tg.rappelPrestataire(req.request_id.slice(0, 12), '', hoursInStatus));
     }
   }
 
@@ -254,6 +287,10 @@ async function checkBCsPendingValidation(): Promise<void> {
         status_at_trigger: 'draft',
         hours_in_status: hoursWaiting,
       });
+
+      // Telegram — directeur d'entité
+      const dirChats = await getTelegramChatIds('directeur_de_site', bc.issuing_entity_id);
+      await sendTelegramMulti(dirChats, tg.bcAValider(bc.po_number, 0, ''));
       reminded++;
     }
   }
@@ -301,6 +338,10 @@ async function checkConfirmationsPending(): Promise<void> {
         status_at_trigger: 'a_confirmer',
         hours_in_status: hoursWaiting,
       });
+
+      // Telegram — demandeur
+      const demChats = await getTelegramChatIds('demandeur');
+      await sendTelegramMulti(demChats, tg.confirmationRequise(req.request_id.slice(0, 12), ''));
       reminded++;
     }
   }
