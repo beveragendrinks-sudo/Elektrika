@@ -7,21 +7,18 @@
 import type { RequestStatus } from '@/types';
 
 export const STATUS_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
-  draft: ['pending_management_validation', 'clarification', 'cancelled'],
-  pending_management_validation: ['clarification', 'cancelled'],
-  clarification: ['preparation', 'ready_to_plan', 'cancelled'],
-  preparation: ['awaiting_materials', 'ready_to_plan', 'cancelled'],
-  // awaiting_materials → ready_to_plan déclenché automatiquement quand tous les BCs sont received
-  awaiting_materials: ['ready_to_plan', 'cancelled'],
-  ready_to_plan: ['planned', 'cancelled'],
-  planned: ['in_progress', 'cancelled'],
-  in_progress: ['completed_pending_confirmation', 'cancelled'],
-  completed_pending_confirmation: ['accepted'],
+  nouveau:        ['en_attente', 'appel_offre', 'annule'],
+  en_attente:     ['appel_offre', 'en_preparation', 'annule'],
+  appel_offre:    ['en_preparation', 'annule'],
+  en_preparation: ['planifie', 'annule'],
+  planifie:       ['en_cours', 'annule'],
+  en_cours:       ['a_confirmer', 'annule'],
+  a_confirmer:    ['termine'],
   // pas d'annulation possible après travaux terminés : un refus du demandeur
   // se traite via une 2ème intervention liée (parent_request_id), jamais en
   // rouvrant ou en annulant cette fiche — voir createSecondIntervention()
-  cancelled: [],
-  accepted: [],
+  annule:         [],
+  termine:        [],
 };
 
 export interface MaintenanceRequestLike {
@@ -61,8 +58,8 @@ export function canTransition(
   }
 
   if (
-    request.status === 'pending_management_validation' &&
-    nextStatus !== 'cancelled' &&
+    request.status === 'en_attente' &&
+    nextStatus !== 'annule' &&
     request.management_approved !== true
   ) {
     return {
@@ -71,7 +68,7 @@ export function canTransition(
     };
   }
 
-  if (nextStatus === 'cancelled' && (!transitionReason || transitionReason.trim().length === 0)) {
+  if (nextStatus === 'annule' && (!transitionReason || transitionReason.trim().length === 0)) {
     return {
       allowed: false,
       reason: 'Un motif est obligatoire pour annuler une demande',
@@ -89,19 +86,19 @@ export function canTransition(
  * @param requestIssuingEntityId entité émettrice de la demande à approuver
  */
 export function canApproveRequest(
-  userRole: 'admin' | 'direction' | 'site_manager' | 'planner' | 'technician',
+  userRole: 'admin' | 'directeur_general' | 'directeur_de_site' | 'electricien' | 'demandeur',
   userAssignedEntityIds: string[],
   requestIssuingEntityId: string
 ): TransitionResult {
   if (userRole === 'admin') return { allowed: true };
 
-  if (userRole === 'direction' && userAssignedEntityIds.includes(requestIssuingEntityId)) {
+  if (userRole === 'directeur_de_site' && userAssignedEntityIds.includes(requestIssuingEntityId)) {
     return { allowed: true };
   }
 
   return {
     allowed: false,
-    reason: "Seul un responsable direction assigné à l'entité émettrice (ou un admin) peut approuver cette demande",
+    reason: "Seul un directeur de site assigné à l'entité émettrice (ou un admin) peut approuver cette demande",
   };
 }
 
@@ -139,7 +136,7 @@ export function buildSecondInterventionPayload(
       required_skill_id: originalRequest.required_skill_id,
       issuing_entity_id: originalRequest.issuing_entity_id,
       parent_request_id: originalRequest.request_id,
-      status: 'clarification' as RequestStatus, // repart directement en clarification, pas en brouillon
+      status: 'en_preparation' as RequestStatus, // repart directement en préparation
     },
     originalRequestUpdate: {
       // à appliquer sur la fiche d'origine, pour tracer le motif de refus
@@ -182,10 +179,10 @@ export function pointsForType(type: 1 | 2 | 3): 1 | 3 | 5 {
  * Miroir côté app du trigger SQL trg_enforce_po_creation_status.
  */
 export function canGeneratePurchaseOrder(status: RequestStatus): TransitionResult {
-  if (status !== 'preparation' && status !== 'awaiting_materials') {
+  if (status !== 'en_preparation') {
     return {
       allowed: false,
-      reason: `Le bon de commande ne peut être créé qu'aux statuts "préparation" ou "attente matériaux" (statut actuel : ${status})`,
+      reason: `Le bon de commande ne peut être créé qu'au statut "en préparation" (statut actuel : ${status})`,
     };
   }
   return { allowed: true };

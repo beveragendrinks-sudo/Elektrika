@@ -10,6 +10,7 @@ import { computePriorityScore } from '@/lib/workflowEngine';
 interface Props {
   interventionSites: { intervention_site_id: string; label: string }[];
   entities: { entity_id: string; code: string; name: string }[];
+  userRole?: 'demandeur' | 'prestataire';
 }
 
 interface FormState {
@@ -87,7 +88,7 @@ function StepBar({ current }: { current: number }) {
 }
 
 // ── Success screen ─────────────────────────────────────────────────────────
-function SuccessScreen({ requestId, willNeedValidation }: { requestId: string; willNeedValidation: boolean }) {
+function SuccessScreen({ requestId, willNeedValidation, userRole }: { requestId: string; willNeedValidation: boolean; userRole: 'demandeur' | 'prestataire' }) {
   const router = useRouter();
   const shortId = requestId.slice(0, 8).toUpperCase();
 
@@ -99,19 +100,31 @@ function SuccessScreen({ requestId, willNeedValidation }: { requestId: string; w
         </svg>
       </div>
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Demande soumise</h2>
+        <h2 className="text-xl font-bold text-slate-900">
+          {userRole === 'prestataire' ? 'Signalement soumis' : 'Demande soumise'}
+        </h2>
         <p className="text-slate-500 text-sm mt-1">Référence : <span className="font-mono font-semibold text-slate-700">#{shortId}</span></p>
       </div>
       <div className={`rounded-lg p-4 text-sm text-left ${willNeedValidation ? 'bg-amber-50 border border-amber-200' : 'bg-blue-50 border border-blue-200'}`}>
         {willNeedValidation ? (
           <>
             <p className="font-medium text-amber-800">En attente de validation direction</p>
-            <p className="text-amber-700 mt-1">La demande concerne un risque sécurité ou un arrêt de production. Le directeur de votre entité sera notifié pour approbation avant que l&apos;électricien intervienne.</p>
+            <p className="text-amber-700 mt-1">
+              {userRole === 'prestataire'
+                ? "Le signalement concerne un risque sécurité ou un arrêt de production. Le directeur de l'entité devra valider avant planification."
+                : "La demande concerne un risque sécurité ou un arrêt de production. Le directeur de votre entité sera notifié pour approbation avant que l'électricien intervienne."}
+            </p>
           </>
         ) : (
           <>
-            <p className="font-medium text-blue-800">En cours de clarification</p>
-            <p className="text-blue-700 mt-1">Le prestataire de service assigné va prendre contact avec vous pour comprendre la panne et préparer son intervention.</p>
+            <p className="font-medium text-blue-800">
+              {userRole === 'prestataire' ? 'Signalement enregistré' : 'En cours de clarification'}
+            </p>
+            <p className="text-blue-700 mt-1">
+              {userRole === 'prestataire'
+                ? "Votre signalement a été transmis au responsable d'entité. Il sera planifié dans vos interventions à venir."
+                : "Le prestataire de service assigné va prendre contact avec vous pour comprendre la panne et préparer son intervention."}
+            </p>
           </>
         )}
       </div>
@@ -134,7 +147,7 @@ function SuccessScreen({ requestId, willNeedValidation }: { requestId: string; w
 }
 
 // ── Main form ──────────────────────────────────────────────────────────────
-export default function NewDemandeForm({ interventionSites, entities }: Props) {
+export default function NewDemandeForm({ interventionSites, entities, userRole = 'demandeur' }: Props) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [photos, setPhotos] = useState<File[]>([]);
@@ -201,7 +214,7 @@ export default function NewDemandeForm({ interventionSites, entities }: Props) {
 
     try {
       const needsValidation = form.safety_risk || form.production_stop;
-      const initialStatus = needsValidation ? 'pending_management_validation' : 'clarification';
+      const initialStatus = needsValidation ? 'en_attente' : 'nouveau';
 
       const priorityScore = computePriorityScore({
         safetyRisk: form.safety_risk,
@@ -284,7 +297,7 @@ export default function NewDemandeForm({ interventionSites, entities }: Props) {
   const needsValidation = form.safety_risk || form.production_stop;
 
   if (successId) {
-    return <SuccessScreen requestId={successId} willNeedValidation={needsValidation} />;
+    return <SuccessScreen requestId={successId} willNeedValidation={needsValidation} userRole={userRole} />;
   }
 
   return (
@@ -475,11 +488,11 @@ export default function NewDemandeForm({ interventionSites, entities }: Props) {
           {/* ── Personne à contacter ──────────────────────────────────── */}
           <div className="pt-1">
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Personne à contacter pour clarification
+              {userRole === 'prestataire' ? 'Responsable à contacter sur site' : 'Personne à contacter pour clarification'}
             </label>
             <div className="space-y-2">
               {([
-                { value: 'demandeur', label: 'Le demandeur lui-même' },
+                { value: 'demandeur', label: userRole === 'prestataire' ? 'Le responsable de l\'entité' : 'Le demandeur lui-même' },
                 { value: 'autre',     label: 'Autre personne' },
               ] as const).map(({ value, label }) => (
                 <button
@@ -686,15 +699,17 @@ export default function NewDemandeForm({ interventionSites, entities }: Props) {
                 <dt className="text-slate-500">Entité</dt>
                 <dd className="font-medium text-slate-900">{selectedEntity?.code}</dd>
               </div>
+              {userRole !== 'prestataire' && (
+                <div className="flex justify-between">
+                  <dt className="text-slate-500">Prestataire</dt>
+                  <dd className="font-medium text-slate-400 italic">Assigné par le responsable</dd>
+                </div>
+              )}
               <div className="flex justify-between">
-                <dt className="text-slate-500">Prestataire</dt>
-                <dd className="font-medium text-slate-400 italic">Assigné par le responsable</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-500">Contact clarification</dt>
+                <dt className="text-slate-500">{userRole === 'prestataire' ? 'Contact sur site' : 'Contact clarification'}</dt>
                 <dd className="font-medium text-slate-900">
                   {form.contact_type === 'demandeur'
-                    ? 'Le demandeur'
+                    ? (userRole === 'prestataire' ? 'Responsable entité' : 'Le demandeur')
                     : form.contact_name || 'Autre personne'}
                   {form.contact_type === 'autre' && form.contact_phone && (
                     <span className="text-slate-500 font-normal"> · {form.contact_phone}</span>

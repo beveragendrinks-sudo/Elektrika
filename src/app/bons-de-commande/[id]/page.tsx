@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense, useRef, useState } from 'react';
 import { sendBCToFournisseurAction } from '@/app/actions/sendBCToFournisseur';
+import BCDevisSection from './BCDevisSection';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface BCLine {
@@ -21,6 +22,12 @@ interface EntityProfile {
   matricule_fiscale: string;
 }
 
+interface DevisAttachment {
+  name: string;
+  size: string;
+  type: 'pdf' | 'image';
+}
+
 interface BCData {
   po_number: string;
   status: string;
@@ -31,6 +38,10 @@ interface BCData {
   supplier: { name: string; contact: string; phone: string; email: string; address: string };
   lines: BCLine[];
   notes: string;
+  devis?: DevisAttachment[];
+  devis_comparative?: boolean;
+  devis_justification?: string;
+  categoryKey?: import('@/types').InterventionCategory;
 }
 
 // ── Profils d'entités (configurables dans Settings → Paramètres entités) ───
@@ -71,6 +82,13 @@ const ENTITY_PROFILES: Record<string, EntityProfile> = {
     phone: '+216 71 678 901',
     matricule_fiscale: '5678901/E/M/000',
   },
+  'Privée': {
+    code: 'Privée',
+    full_name: 'Propriété Privée',
+    address: '12 Rue des Oliviers, 2080 Ariana',
+    phone: '+216 71 789 555',
+    matricule_fiscale: '6789012/F/P/000',
+  },
 };
 
 // ── Mock BCs (remplacé par fetch Supabase) ─────────────────────────────────
@@ -102,6 +120,12 @@ const MOCK_BCS: Record<string, BCData> = {
       { description: 'Connecteurs type F - lot 10 pièces', quantity: 2, unit: 'lot', unit_price: 18.75 },
     ],
     notes: 'Livraison souhaitée avant le 05/07/2026. Contacter M. Salah avant livraison.',
+    devis: [
+      { name: 'Devis_Elkateb_Electricite_2026-06-28.pdf', size: '245 Ko', type: 'pdf' },
+      { name: 'Devis_Tunisie_Electrique_2026-06-29.pdf', size: '312 Ko', type: 'pdf' },
+    ],
+    devis_comparative: true,
+    categoryKey: 'electricite',
   },
   'bc-3': {
     po_number: 'BC-FAD-2026-000027',
@@ -130,6 +154,7 @@ const MOCK_BCS: Record<string, BCData> = {
       { description: 'Huile hydraulique HM46 (bidon 20L)', quantity: 1, unit: 'bidon', unit_price: 85 },
     ],
     notes: 'Livraison urgente requise avant le 10/07/2026. La pompe actuelle est hors service.',
+    categoryKey: 'plomberie',
   },
   'bc-2': {
     po_number: 'BC-LAD-2026-000038',
@@ -157,6 +182,99 @@ const MOCK_BCS: Record<string, BCData> = {
       { description: 'Disjoncteur différentiel 40A 30mA', quantity: 2, unit: 'pièce', unit_price: 45 },
     ],
     notes: '',
+    categoryKey: 'electricite',
+  },
+  'bc-4': {
+    po_number: 'BC-FAD-2026-000039',
+    status: 'sent',
+    created_at: '2026-07-14',
+    entity: 'FAD',
+    electrician: 'Hichem Trabelsi',
+    demande: {
+      id: '9',
+      title: 'Remplacement pompe hydraulique P-12',
+      site: 'Pôle Industriel, Jbel Oust',
+      type: 'Réparation avec matériel',
+      entity: 'FAD',
+      location_comment: 'Salle des machines — circuit hydraulique principal',
+    },
+    supplier: {
+      name: 'Techno Hydraulique Tunisie',
+      contact: 'M. Sami Mrad',
+      phone: '+216 73 456 789',
+      email: 'sami.mrad@techno-hyd.tn',
+      address: '22 Zone Industrielle Beni Khaled, 8061 Nabeul',
+    },
+    lines: [
+      { description: 'Filtre hydraulique haute pression 25 microns', quantity: 2, unit: 'pièce', unit_price: 185 },
+      { description: "Joints toriques NBR kit 50 pièces", quantity: 2, unit: 'kit', unit_price: 55 },
+      { description: 'Flexible hydraulique DN12 800mm', quantity: 3, unit: 'pièce', unit_price: 70 },
+    ],
+    notes: 'Livraison urgente — pompe principale FAD Jbel Oust hors service.',
+    categoryKey: 'plomberie',
+  },
+  'bc-5': {
+    po_number: 'BC-FAD-2026-000042',
+    status: 'sent',
+    created_at: '2026-07-13',
+    entity: 'FAD',
+    electrician: 'Hichem Trabelsi',
+    demande: {
+      id: '9',
+      title: 'Remplacement pompe hydraulique P-12',
+      site: 'Pôle Industriel, Jbel Oust',
+      type: 'Réparation avec matériel',
+      entity: 'FAD',
+      location_comment: 'Salle des machines — circuit hydraulique principal',
+    },
+    supplier: {
+      name: 'Techno Hydraulique Tunisie',
+      contact: 'M. Sami Mrad',
+      phone: '+216 73 456 789',
+      email: 'sami.mrad@techno-hyd.tn',
+      address: '22 Zone Industrielle Beni Khaled, 8061 Nabeul',
+    },
+    lines: [
+      { description: 'Pompe hydraulique à engrenages 18cc/tr', quantity: 1, unit: 'pièce', unit_price: 1250 },
+      { description: "Joint d'étanchéité kit complet", quantity: 2, unit: 'kit', unit_price: 45 },
+      { description: 'Huile hydraulique HM46 (bidon 20L)', quantity: 1, unit: 'bidon', unit_price: 85 },
+    ],
+    notes: 'Livraison urgente requise avant le 18/07/2026. La pompe actuelle est hors service.',
+    categoryKey: 'plomberie',
+  },
+  'bc-6': {
+    po_number: 'BC-LAD-2026-000043',
+    status: 'draft',
+    created_at: '2026-07-10',
+    entity: 'LAD',
+    electrician: 'Anis Trabelsi',
+    demande: {
+      id: '12',
+      title: 'Peinture couloir administratif — bâtiment A',
+      site: 'Siège Ben Arous',
+      type: 'Travaux de peinture',
+      entity: 'LAD',
+      location_comment: 'Couloir A3 — bâtiment administratif, rez-de-chaussée',
+    },
+    supplier: {
+      name: 'Peintures & Déco Tunis',
+      contact: 'M. Nabil Hamdi',
+      phone: '+216 71 789 012',
+      email: 'commercial@peintures-deco.tn',
+      address: '8 Rue Alain Savary, Tunis 1003',
+    },
+    lines: [
+      { description: 'Enduit de lissage — sac 25kg', quantity: 2, unit: 'sac', unit_price: 32 },
+      { description: 'Peinture lessivable blanc cassé — pot 15L', quantity: 3, unit: 'pot', unit_price: 118 },
+      { description: 'Papier de verre grain 120 — feuille', quantity: 5, unit: 'feuille', unit_price: 2 },
+    ],
+    notes: 'Travaux à réaliser hors heures de bureau. Intervention prévue le 21/07/2026.',
+    devis: [
+      { name: 'Devis_Peintures_Deco_Tunis_2026-07-10.pdf', size: '198 Ko', type: 'pdf' },
+    ],
+    devis_comparative: false,
+    devis_justification: 'Fournisseur homologué par la direction, accord-cadre peinture en vigueur pour l\'exercice 2026.',
+    categoryKey: 'peinture',
   },
 };
 
@@ -187,8 +305,86 @@ function fmtDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+// ── Signature Pad ──────────────────────────────────────────────────────────
+function SignaturePad({ label, onSigned }: { label: string; onSigned: (dataUrl: string) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawingRef = useRef(false);
+  const [signed, setSigned] = useState(false);
+
+  function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect();
+    if ('touches' in e) {
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function startDraw(e: React.MouseEvent | React.TouchEvent) {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d'); if (!ctx) return;
+    const pos = getPos(e, canvas);
+    ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
+    drawingRef.current = true;
+  }
+
+  function draw(e: React.MouseEvent | React.TouchEvent) {
+    if (!drawingRef.current) return;
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d'); if (!ctx) return;
+    e.preventDefault();
+    const pos = getPos(e, canvas);
+    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#1e293b';
+    ctx.lineTo(pos.x, pos.y); ctx.stroke();
+  }
+
+  function endDraw() {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    const canvas = canvasRef.current; if (!canvas) return;
+    const dataUrl = canvas.toDataURL();
+    setSigned(true);
+    onSigned(dataUrl);
+  }
+
+  function clear() {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d'); if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawingRef.current = false;
+    setSigned(false);
+    onSigned('');
+  }
+
+  return (
+    <div>
+      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{label}</div>
+      <div className="relative border border-dashed border-slate-300 rounded-lg overflow-hidden bg-white" style={{ height: '80px' }}>
+        <canvas
+          ref={canvasRef} width={320} height={80}
+          className="w-full h-full cursor-crosshair touch-none"
+          onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
+          onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
+        />
+        {!signed && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-xs text-slate-300">Signez ici</span>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-between mt-1">
+        <div className="text-xs text-slate-500">Signer avec la souris ou le doigt</div>
+        {signed && (
+          <button onClick={clear} className="text-[10px] text-red-500 hover:underline">Effacer</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── BC Document ────────────────────────────────────────────────────────────
 function BCDocument({ bc, docRef }: { bc: BCData; docRef: React.RefObject<HTMLDivElement> }) {
+  const [sigElectricien, setSigElectricien] = useState('');
+  const [sigDirecteur, setSigDirecteur]     = useState('');
   const grandTotal = bc.lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
   const entity = ENTITY_PROFILES[bc.entity] ?? {
     code: bc.entity,
@@ -369,18 +565,62 @@ function BCDocument({ bc, docRef }: { bc: BCData; docRef: React.RefObject<HTMLDi
           </div>
         )}
 
+        {/* ── Zone 6.5 : Devis joints ─────────────────────────────────── */}
+        {bc.devis && bc.devis.length > 0 && (
+          <div>
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+              Devis fournisseur joints
+            </div>
+            <div className="border border-slate-200 rounded-lg overflow-hidden divide-y divide-slate-100">
+              {bc.devis.map((d, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3 bg-white">
+                  <span className="text-xl shrink-0">{d.type === 'pdf' ? '📄' : '🖼️'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-800 truncate">{d.name}</div>
+                    <div className="text-xs text-slate-400">{d.size} · {d.type === 'pdf' ? 'PDF' : 'Image'}</div>
+                  </div>
+                  <span className="text-xs text-slate-400 shrink-0">Devis {i + 1}</span>
+                </div>
+              ))}
+            </div>
+            <div className={`mt-2 flex items-start gap-2 text-xs px-4 py-3 rounded-lg border ${bc.devis_comparative ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+              {bc.devis_comparative ? (
+                <>
+                  <svg className="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Au moins 2 devis comparatifs fournis — procédure respectée.</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                  <span><strong>Devis unique</strong> — {bc.devis_justification}</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Zone 7 : Signatures ─────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-12 pt-6 border-t-2 border-slate-200">
           <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Établi par</div>
-            <div className="h-16 border-b border-dashed border-slate-300 mb-3"></div>
-            <div className="text-sm font-semibold text-slate-800">{bc.electrician}</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Établi par</div>
+            <SignaturePad label="" onSigned={setSigElectricien} />
+            {sigElectricien ? (
+              <img src={sigElectricien} alt="Signature" className="mt-1 h-12 object-contain" />
+            ) : null}
+            <div className="text-sm font-semibold text-slate-800 mt-2">{bc.electrician}</div>
             <div className="text-xs text-slate-400 mt-0.5">Prestataire de service · {entity.code}</div>
           </div>
           <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Approuvé par</div>
-            <div className="h-16 border-b border-dashed border-slate-300 mb-3"></div>
-            <div className="text-sm font-semibold text-slate-400">Directeur — {entity.code}</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Approuvé par</div>
+            <SignaturePad label="" onSigned={setSigDirecteur} />
+            {sigDirecteur ? (
+              <img src={sigDirecteur} alt="Signature" className="mt-1 h-12 object-contain" />
+            ) : null}
+            <div className="text-sm font-semibold text-slate-800 mt-2">Directeur — {entity.code}</div>
             <div className="text-xs text-slate-300 mt-0.5">Signature et cachet</div>
           </div>
         </div>
@@ -396,7 +636,7 @@ function BCDocument({ bc, docRef }: { bc: BCData; docRef: React.RefObject<HTMLDi
 
 // ── BC Validation Panel ────────────────────────────────────────────────────
 function BCValidationPanel({
-  bcStatus, poNumber, supplierContact, demandeTitle, entityName, requestId,
+  bcStatus, poNumber, supplierContact, demandeTitle, entityName, requestId, devisReady = false,
 }: {
   bcStatus: string;
   poNumber: string;
@@ -404,6 +644,7 @@ function BCValidationPanel({
   demandeTitle: string;
   entityName: string;
   requestId?: string;
+  devisReady?: boolean;
 }) {
   const [remarques, setRemarques] = useState('');
   const [action, setAction] = useState<'idle' | 'validating' | 'rejecting' | 'validated' | 'rejected'>('idle');
@@ -486,6 +727,11 @@ function BCValidationPanel({
             className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none transition-colors disabled:opacity-50"
           />
         </div>
+        {!devisReady && (
+          <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            ⚠ Minimum 2 devis fournisseurs requis avant de valider ce BC
+          </div>
+        )}
         <div className="flex gap-3">
           <button
             onClick={() => doAction('rejecting')}
@@ -496,8 +742,8 @@ function BCValidationPanel({
           </button>
           <button
             onClick={() => doAction('validating')}
-            disabled={busy}
-            className="flex-1 bg-green-600 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            disabled={busy || !devisReady}
+            className="flex-1 bg-green-600 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {action === 'validating' ? (
               <>
@@ -626,6 +872,7 @@ function BCPageInner({ id }: { id: string }) {
         notes: '',
       }
     : (MOCK_BCS[id] ?? null);
+  const [devisReady, setDevisReady] = useState(bc?.devis_comparative === true);
 
   async function downloadPDF() {
     if (!docRef.current || !bc) return;
@@ -732,6 +979,14 @@ function BCPageInner({ id }: { id: string }) {
       </div>
 
       <div className="max-w-4xl mx-auto space-y-6">
+        {bc.categoryKey && bc.status === 'draft' && (
+          <BCDevisSection
+            bcId={id}
+            bcNumber={bc.po_number}
+            category={bc.categoryKey}
+            onReady={setDevisReady}
+          />
+        )}
         <BCValidationPanel
           bcStatus={bc.status}
           poNumber={bc.po_number}
@@ -739,6 +994,7 @@ function BCPageInner({ id }: { id: string }) {
           demandeTitle={bc.demande.title}
           entityName={bc.entity}
           requestId={bc.demande.id || undefined}
+          devisReady={devisReady}
         />
         <BCDeliveryPanel bcStatus={bc.status} demandeTitle={bc.demande.title} />
         <BCDocument bc={bc} docRef={docRef} />

@@ -50,8 +50,8 @@ function PhotoZone({ label, description, icon, files, multiple = true, onFiles }
 interface ClotureSectionProps {
   demandeId: string;
   otId: string;
-  /** Affiché seulement pour les statuts 'planned' | 'in_progress' */
-  status?: 'planned' | 'in_progress' | string;
+  /** Affiché seulement pour les statuts 'planifie' | 'en_cours' */
+  status?: string;
 }
 
 export default function ClotureSection({ otId, status }: ClotureSectionProps) {
@@ -77,7 +77,7 @@ export default function ClotureSection({ otId, status }: ClotureSectionProps) {
     setSubmitting(false);
   }
 
-  if (status && status !== 'planned' && status !== 'in_progress') return null;
+  if (status && status !== 'planifie' && status !== 'en_cours') return null;
 
   if (done) {
     return (

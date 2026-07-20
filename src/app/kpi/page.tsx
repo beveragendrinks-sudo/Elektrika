@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import Link from 'next/link';
 import { computeOEI } from '@/lib/kpiEngine';
 import { INTERVENTION_CATEGORIES } from '@/lib/interventionTypes';
 import type { InterventionCategory } from '@/types';
 import FilterBar from '@/components/FilterBar';
 import type { ActiveCategories, ActiveTypes } from '@/components/FilterBar';
+import { computeAllVendorKPIs, type VendorKPI } from '@/lib/quoteData';
+import { CATEGORY_LABEL, CATEGORY_ICON } from '@/lib/interventionData';
 
 // ── Trend data (6 months Fév–Jul) ─────────────────────────────────────────
 const MONTHS = ['Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul'];
@@ -401,10 +404,159 @@ function CategoryBreakdown({ cats, types }: { cats: ActiveCategories; types: Act
   );
 }
 
+// ── Vendor KPI table ──────────────────────────────────────────────────────
+function VendorKPITable({ title, vendors, accentColor }: {
+  title: string;
+  vendors: VendorKPI[];
+  accentColor: 'orange' | 'blue';
+}) {
+  const accent = accentColor === 'orange'
+    ? { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', badge: 'bg-orange-100 text-orange-700' }
+    : { bg: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-800',   badge: 'bg-blue-100 text-blue-700' };
+
+  if (vendors.length === 0) return null;
+
+  return (
+    <div>
+      <h2 className="font-semibold text-slate-800 mb-3">{title}</h2>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className={`px-5 py-3 ${accent.bg} border-b ${accent.border}`}>
+          <div className="grid grid-cols-8 gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+            <div className="col-span-2">Entreprise</div>
+            <div className="text-center">Catégories</div>
+            <div className="text-center">Demandes</div>
+            <div className="text-center">Reçus</div>
+            <div className="text-center">Taux rép.</div>
+            <div className="text-center">Taux victoire</div>
+            <div className="text-center">Délai moy.</div>
+          </div>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {vendors.map(({ vendor, demandesEnvoyees, devisRecus, tauxReponse, tauxVictoire, delaiMoyenReponseH, montantTotalGagne }) => {
+            const respColor = tauxReponse >= 80 ? 'text-green-600' : tauxReponse >= 50 ? 'text-amber-600' : 'text-red-600';
+            const winColor  = tauxVictoire >= 50 ? 'text-green-600' : tauxVictoire >= 25 ? 'text-amber-600' : 'text-slate-500';
+            return (
+              <div key={vendor.id} className="grid grid-cols-8 gap-2 px-5 py-3 items-center hover:bg-slate-50 transition-colors">
+                <div className="col-span-2">
+                  <Link href={`/kpi/vendors/${vendor.id}`} className="text-sm font-medium text-blue-600 hover:underline">{vendor.name}</Link>
+                  <div className="text-xs text-slate-400">{vendor.email}</div>
+                </div>
+                <div className="flex flex-wrap gap-1 justify-center">
+                  {vendor.categories.slice(0, 2).map(cat => (
+                    <span key={cat} className="text-xs" title={CATEGORY_LABEL[cat]}>
+                      {CATEGORY_ICON[cat]}
+                    </span>
+                  ))}
+                  {vendor.categories.length > 2 && (
+                    <span className="text-[10px] text-slate-400">+{vendor.categories.length - 2}</span>
+                  )}
+                </div>
+                <div className="text-center">
+                  <span className="text-sm font-semibold text-slate-700">{demandesEnvoyees}</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-sm text-slate-600">{devisRecus}</span>
+                </div>
+                <div className="text-center">
+                  <span className={`text-sm font-semibold ${respColor}`}>{tauxReponse}%</span>
+                </div>
+                <div className="text-center">
+                  <span className={`text-sm font-semibold ${winColor}`}>
+                    {devisRecus > 0 ? `${tauxVictoire}%` : '—'}
+                  </span>
+                </div>
+                <div className="text-center">
+                  <span className="text-sm text-slate-600">
+                    {delaiMoyenReponseH !== null ? `${delaiMoyenReponseH}h` : '—'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Footer totals */}
+        <div className={`px-5 py-3 ${accent.bg} border-t ${accent.border}`}>
+          <div className="flex items-center justify-between text-xs text-slate-600">
+            <span>{vendors.length} {vendors[0]?.vendor.type === 'prestataire' ? 'prestataires actifs' : 'fournisseurs actifs'}</span>
+            <span className="font-medium">
+              Total gagné : {vendors.reduce((s, v) => s + v.montantTotalGagne, 0).toLocaleString('fr-TN')} TND
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Vendors Tab ───────────────────────────────────────────────────────────
+function VendorsTab() {
+  const allKPIs = computeAllVendorKPIs();
+  const [catFilter, setCatFilter] = useState<string>('all');
+
+  const cats = Array.from(new Set(allKPIs.flatMap(k => k.vendor.categories)));
+  const filtered = catFilter === 'all' ? allKPIs : allKPIs.filter(k => k.vendor.categories.includes(catFilter as InterventionCategory));
+  const prestataires = filtered.filter(k => k.vendor.type === 'prestataire');
+  const fournisseurs  = filtered.filter(k => k.vendor.type === 'fournisseur');
+
+  return (
+    <div className="space-y-6">
+      {/* Filtre catégorie */}
+      <div className="flex gap-2 flex-wrap items-center">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Catégorie</span>
+        <button
+          onClick={() => setCatFilter('all')}
+          className={`text-xs px-3 py-1.5 rounded-xl border transition-all ${catFilter === 'all' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
+        >
+          Toutes
+        </button>
+        {cats.map(c => (
+          <button
+            key={c}
+            onClick={() => setCatFilter(c)}
+            className={`text-xs px-3 py-1.5 rounded-xl border transition-all ${catFilter === c ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
+          >
+            {CATEGORY_ICON[c as InterventionCategory]} {CATEGORY_LABEL[c as InterventionCategory]}
+          </button>
+        ))}
+      </div>
+      <VendorKPITable title="Prestataires de service" vendors={prestataires} accentColor="orange" />
+      <VendorKPITable title="Fournisseurs de matériaux" vendors={fournisseurs} accentColor="blue" />
+    </div>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function KpiPage() {
+  const [activeTab, setActiveTab] = useState<'ops' | 'vendors'>('ops');
   const [selectedCategories, setSelectedCategories] = useState<ActiveCategories>([]);
   const [selectedTypes, setSelectedTypes] = useState<ActiveTypes>([]);
+  const kpiRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+
+  async function exportKpiPDF() {
+    if (!kpiRef.current) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      const canvas = await html2canvas(kpiRef.current, {
+        scale: 2, useCORS: true, logging: false, backgroundColor: '#f8fafc',
+      });
+      const pdf  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const imgH  = (canvas.height * pageW) / canvas.width;
+      const imgData = canvas.toDataURL('image/png');
+      let y = 0;
+      while (y < imgH) {
+        if (y > 0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, -y, pageW, imgH);
+        y += pdf.internal.pageSize.getHeight();
+      }
+      const date = new Date().toISOString().slice(0, 10);
+      pdf.save(`KPI-Facility-Manager-${date}.pdf`);
+    } catch (e) { console.error(e); }
+    finally { setExporting(false); }
+  }
 
   const filtered = computeFiltered(selectedCategories, selectedTypes);
   const hasFilter = selectedCategories.length > 0 || selectedTypes.length > 0;
@@ -438,7 +590,7 @@ export default function KpiPage() {
   ].join(' · ');
 
   return (
-    <div className="space-y-6">
+    <div ref={kpiRef} className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">KPI &amp; Performance</h1>
         <p className="text-slate-500 mt-1">Indicateurs de synthèse · Tendances Fév–Jul 2026 · Données de démonstration</p>
@@ -447,6 +599,37 @@ export default function KpiPage() {
         </p>
       </div>
 
+      {/* Tab switcher + export */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit flex-wrap">
+          <button
+            onClick={() => setActiveTab('ops')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === 'ops' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            📊 Performance opérationnelle
+          </button>
+          <button
+            onClick={() => setActiveTab('vendors')}
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === 'vendors' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            🏢 Prestataires &amp; Fournisseurs
+          </button>
+        </div>
+        <button
+          onClick={exportKpiPDF}
+          disabled={exporting}
+          className="text-xs px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:border-slate-400 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+        >
+          {exporting ? '⏳ Export…' : '⬇ Exporter PDF'}
+        </button>
+      </div>
+
+      {activeTab === 'ops' && (
+      <>
       <FilterBar
         selectedCategories={selectedCategories}
         selectedTypes={selectedTypes}
@@ -589,6 +772,10 @@ export default function KpiPage() {
         </div>
         <div className="text-xs text-slate-400 mt-2">Basé sur 18 retours ce mois</div>
       </div>
+      </>
+      )}
+
+      {activeTab === 'vendors' && <VendorsTab />}
     </div>
   );
 }

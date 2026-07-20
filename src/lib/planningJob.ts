@@ -22,11 +22,11 @@ function nextWorkingDay(): string {
 
 // ── SLA thresholds (heures dans le statut) ─────────────────────────────────
 const SLA_THRESHOLDS: Partial<Record<string, { warn: number; escalate: number }>> = {
-  clarification:                  { warn: 4,  escalate: 24 },
-  preparation:                    { warn: 24, escalate: 72 },
-  planned:                        { warn: 24, escalate: 72 },
-  completed_pending_confirmation: { warn: 24, escalate: 48 },
-  awaiting_materials:             { warn: 48, escalate: 120 },
+  en_attente:     { warn: 8,  escalate: 24 },
+  appel_offre:    { warn: 48, escalate: 96 },
+  en_preparation: { warn: 24, escalate: 72 },
+  planifie:       { warn: 24, escalate: 72 },
+  a_confirmer:    { warn: 24, escalate: 48 },
 };
 
 // ── Planning + SLA job ─────────────────────────────────────────────────────
@@ -40,10 +40,12 @@ export async function runDailyPlanningJob(): Promise<void> {
 }
 
 async function planReadyDemandes(): Promise<void> {
+  // 'en_preparation' items where prestataire is assigned and planning can proceed
   const { data: requests, error } = await supabase
     .from('maintenance_requests')
     .select('request_id, site_id, assigned_technician_id, requested_by, issuing_entity_id, type, points')
-    .eq('status', 'ready_to_plan');
+    .eq('status', 'en_preparation')
+    .not('assigned_technician_id', 'is', null);
 
   if (error) {
     console.error('[Planning] Erreur lecture demandes:', error.message);
@@ -140,7 +142,7 @@ async function checkSlaAlerts(): Promise<void> {
   const { data: requests, error } = await supabase
     .from('maintenance_requests')
     .select('request_id, status, status_changed_at, assigned_technician_id, issuing_entity_id, requested_by')
-    .in('status', statuses);
+    .in('status', statuses as string[]);
 
   if (error || !requests) return;
 
@@ -153,7 +155,7 @@ async function checkSlaAlerts(): Promise<void> {
     if (!thresholds) continue;
 
     const dedupeWindow = new Date(now - 23 * 60 * 60 * 1000).toISOString();
-    const level = hoursInStatus >= thresholds.escalate ? 'escalation' : 'warning';
+    const level = hoursInStatus >= thresholds.escalate ? 'escalation' : 'low';
     const { data: existing } = await supabase
       .from('notifications')
       .select('notification_id')
@@ -197,7 +199,7 @@ async function checkSlaAlerts(): Promise<void> {
       const emailRappel = emailRappelPrestataire(req.request_id, hoursInStatus);
       await supabase.from('notifications').insert({
         request_id: req.request_id,
-        level: 'warning',
+        level: 'low',
         recipient_user_id: req.assigned_technician_id,
         channel: 'email',
         message: `Rappel : demande ${req.request_id.slice(0, 8)} en attente depuis ${hoursInStatus}h. Seuil alerte : ${thresholds.warn}h.`,
@@ -234,7 +236,7 @@ async function checkBCsPendingValidation(): Promise<void> {
         .from('notifications')
         .select('notification_id')
         .eq('request_id', bc.request_id)
-        .eq('level', 'warning')
+        .eq('level', 'low')
         .eq('status_at_trigger', 'draft')
         .gte('created_at', dedupeWindow)
         .limit(1);
@@ -243,7 +245,7 @@ async function checkBCsPendingValidation(): Promise<void> {
       const email = emailBCValidationRequise(bc.po_number, bc.po_id);
       await supabase.from('notifications').insert({
         request_id: bc.request_id,
-        level: 'warning',
+        level: 'low',
         recipient_user_id: bc.issuing_entity_id,
         channel: 'email',
         message: `BC ${bc.po_number} en attente de validation depuis ${hoursWaiting}h. Valider : ${APP_URL}/bons-de-commande/${bc.po_id}`,
@@ -264,7 +266,7 @@ async function checkConfirmationsPending(): Promise<void> {
   const { data: requests, error } = await supabase
     .from('maintenance_requests')
     .select('request_id, status_changed_at, requested_by')
-    .eq('status', 'completed_pending_confirmation');
+    .eq('status', 'a_confirmer');
 
   if (error || !requests) return;
 
@@ -281,8 +283,8 @@ async function checkConfirmationsPending(): Promise<void> {
         .from('notifications')
         .select('notification_id')
         .eq('request_id', req.request_id)
-        .eq('level', 'warning')
-        .eq('status_at_trigger', 'completed_pending_confirmation')
+        .eq('level', 'low')
+        .eq('status_at_trigger', 'a_confirmer')
         .gte('created_at', dedupeWindow)
         .limit(1);
       if (dup && dup.length > 0) continue;
@@ -290,13 +292,13 @@ async function checkConfirmationsPending(): Promise<void> {
       const email = emailConfirmationRequise(req.request_id);
       await supabase.from('notifications').insert({
         request_id: req.request_id,
-        level: 'warning',
+        level: 'low',
         recipient_user_id: req.requested_by,
         channel: 'email',
         message: `Votre intervention est terminée. Merci de confirmer : ${APP_URL}/demandes/${req.request_id}`,
         email_subject: email.subject,
         email_html: email.html,
-        status_at_trigger: 'completed_pending_confirmation',
+        status_at_trigger: 'a_confirmer',
         hours_in_status: hoursWaiting,
       });
       reminded++;

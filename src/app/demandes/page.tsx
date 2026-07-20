@@ -1,300 +1,220 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import type { RequestStatus, InterventionCategory } from '@/types';
+import { Suspense, useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import FilterBar from '@/components/FilterBar';
-import type { ActiveCategories, ActiveTypes } from '@/components/FilterBar';
+import {
+  MOCK_INTERVENTIONS,
+  ACTIVE_STATUSES,
+  HISTORY_STATUSES,
+  CATEGORY_LABEL,
+  CATEGORY_ICON,
+  type InterventionCategory,
+} from '@/lib/interventionData';
+import KanbanBoard from '@/components/KanbanBoard';
+import { HistoryRow } from '@/components/DashboardShared';
 
-interface DemandeSummary {
-  request_id: string;
-  title: string;
-  status: RequestStatus;
-  site_name: string;
-  equipment_name: string;
-  submitted_at: string;
-  priority_score: number;
-  category: InterventionCategory;
-  intervention_type: 1 | 2 | 3;
+const ELECTRICIEN_NAME = 'Mohamed Salah';
+
+function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap ${
+        active
+          ? 'bg-slate-900 text-white border-slate-900'
+          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
-const STATUS_LABELS: Record<RequestStatus, string> = {
-  draft: 'Brouillon',
-  pending_management_validation: 'Validation direction',
-  clarification: 'Clarification',
-  preparation: 'Préparation',
-  awaiting_materials: 'Attente matériaux',
-  ready_to_plan: 'Prête à planifier',
-  planned: 'Planifiée',
-  in_progress: 'En cours',
-  cancelled: 'Annulée',
-  completed_pending_confirmation: 'À confirmer',
-  accepted: 'Acceptée',
-};
+function DemandesContent() {
+  const searchParams   = useSearchParams();
+  const showHistory    = searchParams.get('status') === 'termine';
 
-const STATUS_COLOR: Record<RequestStatus, string> = {
-  draft: 'bg-slate-100 text-slate-600',
-  pending_management_validation: 'bg-amber-100 text-amber-700',
-  clarification: 'bg-yellow-100 text-yellow-700',
-  preparation: 'bg-blue-100 text-blue-700',
-  awaiting_materials: 'bg-orange-100 text-orange-700',
-  ready_to_plan: 'bg-violet-100 text-violet-700',
-  planned: 'bg-indigo-100 text-indigo-700',
-  in_progress: 'bg-cyan-100 text-cyan-700',
-  cancelled: 'bg-red-100 text-red-600',
-  completed_pending_confirmation: 'bg-teal-100 text-teal-700',
-  accepted: 'bg-green-100 text-green-700',
-};
-
-// ── All demandes — IDs 1–5, 8–9 are assigned to the electricien prestataire ──
-const MOCK_DEMANDES: DemandeSummary[] = [
-  {
-    request_id: '1',
-    title: 'Panne tableau électrique atelier B',
-    status: 'clarification',
-    site_name: 'Siège, Ben Arous',
-    equipment_name: 'Tableau TGS-B2',
-    submitted_at: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-    priority_score: 72,
-    category: 'electricite',
-    intervention_type: 1,
-  },
-  {
-    request_id: '2',
-    title: 'Remplacement fusible armoire B3',
-    status: 'in_progress',
-    site_name: 'Siège, Ben Arous',
-    equipment_name: 'Armoire B3',
-    submitted_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    priority_score: 68,
-    category: 'electricite',
-    intervention_type: 1,
-  },
-  {
-    request_id: '3',
-    title: 'Câblage armoire AT-04',
-    status: 'completed_pending_confirmation',
-    site_name: 'Siège, Ben Arous',
-    equipment_name: 'Armoire AT-04',
-    submitted_at: new Date(Date.now() - 52 * 3600 * 1000).toISOString(),
-    priority_score: 45,
-    category: 'electricite',
-    intervention_type: 3,
-  },
-  {
-    request_id: '4',
-    title: 'Disjoncteur Atelier C — remplacement',
-    status: 'planned',
-    site_name: 'Pôle Industriel, Jbel Oust',
-    equipment_name: 'Disjoncteur C3',
-    submitted_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    priority_score: 50,
-    category: 'electricite',
-    intervention_type: 1,
-  },
-  {
-    request_id: '5',
-    title: 'Remplacement variateur fréquence V-08',
-    status: 'preparation',
-    site_name: 'Megrine',
-    equipment_name: 'Variateur V-08',
-    submitted_at: new Date(Date.now() - 18 * 3600 * 1000).toISOString(),
-    priority_score: 60,
-    category: 'electricite',
-    intervention_type: 2,
-  },
-  // ── Non-electrical demandes — visible to managers, not assigned to electricien ──
-  {
-    request_id: '6',
-    title: 'Fuite canalisation atelier C — eau froide',
-    status: 'in_progress',
-    site_name: 'Pôle Industriel, Jbel Oust',
-    equipment_name: 'Réseau eau froide',
-    submitted_at: new Date(Date.now() - 10 * 3600 * 1000).toISOString(),
-    priority_score: 80,
-    category: 'plomberie',
-    intervention_type: 1,
-  },
-  {
-    request_id: '7',
-    title: 'Climatiseur salle serveurs hors service',
-    status: 'ready_to_plan',
-    site_name: 'Siège, Ben Arous',
-    equipment_name: 'Clim. split 18000 BTU',
-    submitted_at: new Date(Date.now() - 20 * 3600 * 1000).toISOString(),
-    priority_score: 90,
-    category: 'climatisation',
-    intervention_type: 2,
-  },
-  {
-    request_id: '8',
-    title: 'Vérification tableau BT — atelier Jbel Oust',
-    status: 'in_progress',
-    site_name: 'Pôle Industriel, Jbel Oust',
-    equipment_name: 'Tableau BT',
-    submitted_at: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
-    priority_score: 55,
-    category: 'electricite',
-    intervention_type: 2,
-  },
-  {
-    request_id: '9',
-    title: 'Remplacement pompe hydraulique P-12',
-    status: 'awaiting_materials',
-    site_name: 'Pôle Industriel, Jbel Oust',
-    equipment_name: 'Pompe P-12',
-    submitted_at: new Date(Date.now() - 60 * 3600 * 1000).toISOString(),
-    priority_score: 65,
-    category: 'electricite',
-    intervention_type: 2,
-  },
-  {
-    request_id: '10',
-    title: 'Fissures mur porteur entrepôt Est',
-    status: 'pending_management_validation',
-    site_name: 'Entrepôt Est, Grombalia',
-    equipment_name: 'Mur B-Est',
-    submitted_at: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
-    priority_score: 60,
-    category: 'maconnerie',
-    intervention_type: 3,
-  },
-  {
-    request_id: '11',
-    title: 'Maintenance préventive armoire P2',
-    status: 'ready_to_plan',
-    site_name: 'Pôle Industriel, Jbel Oust',
-    equipment_name: 'Armoire P2',
-    submitted_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    priority_score: 30,
-    category: 'electricite',
-    intervention_type: 3,
-  },
-  {
-    request_id: '12',
-    title: 'Peinture couloir administratif — bâtiment A',
-    status: 'preparation',
-    site_name: 'Siège, Ben Arous',
-    equipment_name: 'Couloir A3',
-    submitted_at: new Date(Date.now() - 36 * 3600 * 1000).toISOString(),
-    priority_score: 15,
-    category: 'peinture',
-    intervention_type: 3,
-  },
-];
-
-// ── Prestataire profiles — which demandes are assigned + allowed categories ──
-const PRESTATAIRE_PROFILES: Record<string, { assignedIds: string[]; categories: InterventionCategory[] }> = {
-  electricien: {
-    assignedIds: ['1', '2', '3', '4', '5', '8', '9', '11'],
-    categories: ['electricite'],
-  },
-};
-
-function timeAgo(iso: string): string {
-  const hours = (Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60);
-  if (hours < 1) return `${Math.round(hours * 60)} min`;
-  if (hours < 24) return `${Math.round(hours)} h`;
-  return `${Math.round(hours / 24)} j`;
-}
-
-export default function DemandesPage() {
-  const [selectedCategories, setSelectedCategories] = useState<ActiveCategories>([]);
-  const [selectedTypes, setSelectedTypes] = useState<ActiveTypes>([]);
-  const [prestataireProfile, setPrestataireProfile] = useState<typeof PRESTATAIRE_PROFILES[string] | null>(null);
+  const [userRole, setUserRole]         = useState<string>('');
+  const [filterEntity, setFilterEntity] = useState<string>('all');
+  const [filterCat, setFilterCat]       = useState<InterventionCategory | 'all'>('all');
+  const [filterPrest, setFilterPrest]   = useState<string>('all');
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem('fm_session');
-      if (raw) {
-        const session = JSON.parse(raw);
-        const profile = PRESTATAIRE_PROFILES[session.role];
-        if (profile) setPrestataireProfile(profile);
-      }
+      if (raw) setUserRole(JSON.parse(raw).role ?? '');
     } catch { /* localStorage unavailable */ }
   }, []);
 
-  // Restrict to assigned demandes for prestataires
-  const baseDemandes = prestataireProfile
-    ? MOCK_DEMANDES.filter(d => prestataireProfile.assignedIds.includes(d.request_id))
-    : MOCK_DEMANDES;
+  // Reset filters when switching between kanban and history
+  useEffect(() => {
+    setFilterEntity('all');
+    setFilterCat('all');
+    setFilterPrest('all');
+  }, [showHistory]);
 
-  const allowedCategories = prestataireProfile?.categories;
+  const isElectricien = userRole === 'electricien';
 
-  const filtered = baseDemandes.filter(d => {
-    const catOk = selectedCategories.length === 0 || selectedCategories.includes(d.category);
-    const typeOk = selectedTypes.length === 0 || selectedTypes.includes(d.intervention_type);
-    return catOk && typeOk;
-  });
+  // ── Kanban data ───────────────────────────────────────────────────
+  const kanbanBase = useMemo(() => {
+    const active = MOCK_INTERVENTIONS.filter(i => ACTIVE_STATUSES.includes(i.status));
+    return isElectricien ? active.filter(i => i.prestataire === ELECTRICIEN_NAME) : active;
+  }, [isElectricien]);
 
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Demandes de maintenance</h1>
-          <p className="text-slate-500 mt-1">
-            {filtered.length !== baseDemandes.length
-              ? <><span className="font-medium">{filtered.length}</span> / {baseDemandes.length} demandes</>
-              : <>{baseDemandes.length} demande{baseDemandes.length > 1 ? 's' : ''}{prestataireProfile ? ' assignées' : ' actives'}</>
-            }
-          </p>
-        </div>
-        <Link href="/demandes/new" className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors">
-          + Nouvelle demande
-        </Link>
-      </div>
+  const kanbanEntities = useMemo(() => Array.from(new Set(kanbanBase.map(i => i.entity))).sort(), [kanbanBase]);
+  const kanbanCats     = useMemo(() => Array.from(new Set(kanbanBase.map(i => i.category))) as InterventionCategory[], [kanbanBase]);
 
-      <FilterBar
-        selectedCategories={selectedCategories}
-        selectedTypes={selectedTypes}
-        onCategoriesChange={setSelectedCategories}
-        onTypesChange={setSelectedTypes}
-        resultCount={filtered.length}
-        totalCount={baseDemandes.length}
-        allowedCategories={allowedCategories}
-      />
+  const kanbanItems = useMemo(() =>
+    kanbanBase.filter(i =>
+      (filterEntity === 'all' || i.entity === filterEntity) &&
+      (filterCat    === 'all' || i.category === filterCat),
+    ), [kanbanBase, filterEntity, filterCat]);
 
-      <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100">
-        {filtered.length === 0 ? (
-          <div className="px-5 py-12 text-center text-sm text-slate-400">
-            Aucune demande ne correspond aux filtres sélectionnés.
-          </div>
-        ) : (
-          filtered.map((d) => (
-            <div key={d.request_id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
-              <Link
-                href={`/demandes/${d.request_id}`}
-                className="flex-1 min-w-0 flex items-center justify-between gap-4 group"
-              >
-                <div className="space-y-0.5 min-w-0">
-                  <div className="font-medium text-slate-900 truncate group-hover:text-blue-600 transition-colors">{d.title}</div>
-                  <div className="text-sm text-slate-500">{d.equipment_name} — {d.site_name}</div>
-                </div>
-                <div className="flex items-center gap-4 flex-shrink-0">
-                  <div className="text-right hidden sm:block">
-                    <div className="text-xs text-slate-400">priorité</div>
-                    <div className="text-sm font-semibold text-slate-700">{d.priority_score}</div>
-                  </div>
-                  <div className="text-xs text-slate-400 w-10 text-right hidden sm:block">{timeAgo(d.submitted_at)}</div>
-                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLOR[d.status]}`}>
-                    {STATUS_LABELS[d.status]}
-                  </span>
-                </div>
+  // ── History data ──────────────────────────────────────────────────
+  const historyBase = useMemo(() => {
+    const closed = MOCK_INTERVENTIONS.filter(i => HISTORY_STATUSES.includes(i.status));
+    return isElectricien ? closed.filter(i => i.prestataire === ELECTRICIEN_NAME) : closed;
+  }, [isElectricien]);
+
+  const historyEntities = useMemo(() => Array.from(new Set(historyBase.map(i => i.entity))).sort(), [historyBase]);
+  const historyCats     = useMemo(() => Array.from(new Set(historyBase.map(i => i.category))) as InterventionCategory[], [historyBase]);
+  const historyPrests   = useMemo(() => Array.from(new Set(historyBase.filter(i => i.prestataire).map(i => i.prestataire!))), [historyBase]);
+
+  const historyItems = useMemo(() =>
+    historyBase.filter(i =>
+      (filterEntity === 'all' || i.entity === filterEntity) &&
+      (filterCat    === 'all' || i.category === filterCat) &&
+      (filterPrest  === 'all' || i.prestataire === filterPrest),
+    ), [historyBase, filterEntity, filterCat, filterPrest]);
+
+  const newDemandeHref  = isElectricien ? '/demandes/new?as=prestataire' : '/demandes/new';
+  const newDemandeLabel = isElectricien ? '+ Signaler' : '+ Nouvelle demande';
+
+  // ── History view ──────────────────────────────────────────────────
+  if (showHistory) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Link href="/demandes" className="text-sm text-slate-400 hover:text-slate-700 transition-colors">
+                ← Interventions actives
               </Link>
-
-              {(d.status === 'preparation' || d.status === 'awaiting_materials') && (
-                <Link
-                  href={`/bons-de-commande/new?request_id=${d.request_id}`}
-                  className="shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-slate-500 hover:text-slate-900 transition-colors whitespace-nowrap"
-                  title="Créer un Bon de Commande"
-                >
-                  + BC
-                </Link>
-              )}
             </div>
-          ))
+            <h1 className="text-2xl font-bold text-slate-900">Historique</h1>
+            <p className="text-slate-500 mt-1 text-sm">
+              <span className="font-medium">{historyItems.length}</span> intervention{historyItems.length !== 1 ? 's' : ''} close{historyItems.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="space-y-2">
+          {!isElectricien && historyEntities.length > 1 && (
+            <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 self-center pr-1">Entité</span>
+              <FilterChip active={filterEntity === 'all'} onClick={() => setFilterEntity('all')}>Toutes</FilterChip>
+              {historyEntities.map(e => (
+                <FilterChip key={e} active={filterEntity === e} onClick={() => setFilterEntity(e)}>🏭 {e}</FilterChip>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 flex-wrap sm:flex-nowrap">
+            <div className="flex gap-1.5 overflow-x-auto">
+              <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 self-center pr-1">Catég.</span>
+              <FilterChip active={filterCat === 'all'} onClick={() => setFilterCat('all')}>Tout</FilterChip>
+              {historyCats.map(cat => (
+                <FilterChip key={cat} active={filterCat === cat} onClick={() => setFilterCat(cat)}>
+                  {CATEGORY_ICON[cat]} {CATEGORY_LABEL[cat]}
+                </FilterChip>
+              ))}
+            </div>
+            {historyPrests.length > 0 && (
+              <div className="flex gap-1.5 overflow-x-auto">
+                <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 self-center pr-1">Prest.</span>
+                <FilterChip active={filterPrest === 'all'} onClick={() => setFilterPrest('all')}>Tous</FilterChip>
+                {historyPrests.map(p => (
+                  <FilterChip key={p} active={filterPrest === p} onClick={() => setFilterPrest(p)}>
+                    👤 {p.split(' ')[0]}
+                  </FilterChip>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {historyItems.length === 0 ? (
+          <div className="py-16 text-center text-sm text-slate-400">Aucune intervention dans l&apos;historique</div>
+        ) : (
+          <div className="space-y-2">
+            {historyItems.map(i => (
+              <HistoryRow key={i.id} item={i} variant="full" showEntity={filterEntity === 'all' && !isElectricien} />
+            ))}
+          </div>
         )}
       </div>
+    );
+  }
+
+  // ── Kanban view ───────────────────────────────────────────────────
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Demandes d&apos;intervention</h1>
+          <p className="text-slate-500 mt-1 text-sm">
+            <span className="font-medium">{kanbanItems.length}</span> intervention{kanbanItems.length !== 1 ? 's' : ''} active{kanbanItems.length !== 1 ? 's' : ''}
+            {filterEntity !== 'all' && <> · {filterEntity}</>}
+            {filterCat !== 'all' && <> · {CATEGORY_LABEL[filterCat]}</>}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/demandes?status=termine"
+            className="text-sm text-slate-500 border border-slate-200 px-3 py-2 rounded-xl hover:border-slate-400 transition-colors"
+          >
+            🕐 Historique
+          </Link>
+          <Link
+            href={newDemandeHref}
+            className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors"
+          >
+            {newDemandeLabel}
+          </Link>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {!isElectricien && kanbanEntities.length > 1 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 self-center pr-1">Entité</span>
+            <FilterChip active={filterEntity === 'all'} onClick={() => setFilterEntity('all')}>Toutes</FilterChip>
+            {kanbanEntities.map(e => (
+              <FilterChip key={e} active={filterEntity === e} onClick={() => setFilterEntity(e)}>🏭 {e}</FilterChip>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+          <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 self-center pr-1">Catég.</span>
+          <FilterChip active={filterCat === 'all'} onClick={() => setFilterCat('all')}>Tout</FilterChip>
+          {kanbanCats.map(cat => (
+            <FilterChip key={cat} active={filterCat === cat} onClick={() => setFilterCat(cat)}>
+              {CATEGORY_ICON[cat]} {CATEGORY_LABEL[cat]}
+            </FilterChip>
+          ))}
+        </div>
+      </div>
+
+      <KanbanBoard interventions={kanbanItems} />
     </div>
+  );
+}
+
+export default function DemandesPage() {
+  return (
+    <Suspense fallback={<div className="py-12 text-center text-sm text-slate-400">Chargement…</div>}>
+      <DemandesContent />
+    </Suspense>
   );
 }

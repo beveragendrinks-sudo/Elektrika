@@ -1,4 +1,5 @@
 import type { InterventionCategory, InterventionNature } from '@/types';
+import { CATEGORY_ICON } from './interventionData';
 
 export interface InterventionCategoryOption {
   id: InterventionCategory;
@@ -15,48 +16,13 @@ export interface InterventionNatureOption {
 }
 
 export const INTERVENTION_CATEGORIES: InterventionCategoryOption[] = [
-  {
-    id: 'electricite',
-    label: 'Électricité',
-    icon: '⚡',
-    examples: 'Éclairage, prises, tableaux électriques, câblage, disjoncteurs, groupes électrogènes, UPS',
-  },
-  {
-    id: 'plomberie',
-    label: 'Plomberie & Sanitaire',
-    icon: '🔧',
-    examples: 'Fuites, robinets, WC, lavabos, réseaux d\'eau potable et d\'eaux usées, pompes',
-  },
-  {
-    id: 'climatisation',
-    label: 'Climatisation',
-    icon: '❄️',
-    examples: 'Climatisation, VMC, ventilation, extraction, maintenance des unités, nettoyage des filtres',
-  },
-  {
-    id: 'maconnerie',
-    label: 'Maçonnerie & Génie civil',
-    icon: '🏗️',
-    examples: 'Réparation de murs, sols, plafonds, fondations, rampes, trottoirs, caniveaux',
-  },
-  {
-    id: 'peinture',
-    label: 'Peinture & Finitions',
-    icon: '🎨',
-    examples: 'Peinture intérieure/extérieure, marquage au sol, enduits, retouches',
-  },
-  {
-    id: 'menuiserie',
-    label: 'Menuiserie & Serrurerie',
-    icon: '🚪',
-    examples: 'Portes, fenêtres, serrures, portails, mobilier fixe, cloisons',
-  },
-  {
-    id: 'autres',
-    label: 'Autres',
-    icon: '🔩',
-    examples: 'Toiture, voirie, réseaux techniques, sécurité bâtiments, petits travaux, contrats prestataires',
-  },
+  { id: 'electricite',   label: 'Électricité',            icon: CATEGORY_ICON['electricite'],   examples: 'Éclairage, prises, tableaux électriques, câblage, disjoncteurs, groupes électrogènes, UPS' },
+  { id: 'plomberie',     label: 'Plomberie & Sanitaire',  icon: CATEGORY_ICON['plomberie'],     examples: "Fuites, robinets, WC, lavabos, réseaux d'eau potable et d'eaux usées, pompes" },
+  { id: 'climatisation', label: 'Climatisation',          icon: CATEGORY_ICON['climatisation'], examples: 'Climatisation, VMC, ventilation, extraction, maintenance des unités, nettoyage des filtres' },
+  { id: 'maconnerie',    label: 'Maçonnerie & Génie civil',icon: CATEGORY_ICON['maconnerie'],   examples: 'Réparation de murs, sols, plafonds, fondations, rampes, trottoirs, caniveaux' },
+  { id: 'peinture',      label: 'Peinture & Finitions',   icon: CATEGORY_ICON['peinture'],      examples: 'Peinture intérieure/extérieure, marquage au sol, enduits, retouches' },
+  { id: 'menuiserie',    label: 'Menuiserie & Serrurerie',icon: CATEGORY_ICON['menuiserie'],    examples: 'Portes, fenêtres, serrures, portails, mobilier fixe, cloisons' },
+  { id: 'autres',        label: 'Autres',                 icon: CATEGORY_ICON['autres'],        examples: 'Toiture, voirie, réseaux techniques, sécurité bâtiments, petits travaux, contrats prestataires' },
 ];
 
 export const INTERVENTION_NATURES: InterventionNatureOption[] = [

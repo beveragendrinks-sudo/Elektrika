@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { ENTITY_LIST, getAllSites, entitySitesLabel, getEntitiesForSite } from '@/lib/entities';
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Tab = 'sites' | 'entities' | 'prestataires' | 'fournisseurs' | 'users' | 'objectifs' | 'alertes';
+type Tab = 'sites' | 'entities' | 'prestataires' | 'fournisseurs' | 'users' | 'objectifs' | 'alertes' | 'email';
 
 type UserRoleType = 'admin' | 'directeur_general' | 'directeur_de_site' | 'electricien' | 'demandeur';
 
@@ -54,7 +54,7 @@ const ROLE_COLORS: Record<UserRoleType, string> = {
   demandeur:           'bg-green-100 text-green-800',
 };
 
-const ENTITIES_OPTS = ['LAD', 'FAD', 'BTFI', '3Ps', 'K&Ko', 'Groupe'];
+const ENTITIES_OPTS = ['LAD', 'FAD', 'BTFI', '3Ps', 'K&Ko', 'Privée', 'Groupe'];
 
 // Résumé de tous les sites par entité — ex: "Siège Ben Arous · Unité de Production La Manouba"
 const ENTITY_SITE: Record<string, string> = Object.fromEntries(
@@ -120,7 +120,8 @@ const MOCK_ENTITIES: EntityDetail[] = [
   { id: '2', code: 'FAD',   name: 'FAD',   full_name: 'FAD Industrie S.A.R.L.', address: 'Pôle Industriel Jbel Oust, 2082 Jbel Oust',      phone: '+216 72 345 678', matricule_fiscale: '2345678/B/P/000', active: true },
   { id: '3', code: 'BTFI',  name: 'BTFI',  full_name: 'BTFI Technologie',       address: 'Sénia Beni Khaled, 8061 Beni Khaled',            phone: '+216 72 456 789', matricule_fiscale: '3456789/C/N/000', active: true },
   { id: '4', code: '3Ps',   name: '3Ps',   full_name: '3Ps Solutions',          address: 'Route de Megrine, 2033 Megrine',                  phone: '+216 71 567 890', matricule_fiscale: '4567890/D/M/000', active: true },
-  { id: '5', code: 'K&Ko',  name: 'K&Ko',  full_name: 'K&Ko Groupe',            address: 'Zone Carthage, 2016 Carthage',                   phone: '+216 71 678 901', matricule_fiscale: '5678901/E/M/000', active: true },
+  { id: '5', code: 'K&Ko',   name: 'K&Ko',   full_name: 'K&Ko Groupe',       address: 'Zone Carthage, 2016 Carthage',            phone: '+216 71 678 901', matricule_fiscale: '5678901/E/M/000', active: true },
+  { id: '6', code: 'Privée', name: 'Privée', full_name: 'Propriété Privée', address: '12 Rue des Oliviers, 2080 Ariana',        phone: '+216 71 789 555', matricule_fiscale: '6789012/F/P/000', active: true },
 ];
 
 interface Prestataire {
@@ -146,9 +147,19 @@ const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
 const ALL_CATEGORY_KEYS = Object.keys(CATEGORY_LABELS);
 
 const MOCK_PRESTATAIRES: Prestataire[] = [
-  { id: '1', name: 'Mohamed Salah', site: 'Siège, Ben Arous (LAD)',            categories: ['electricite', 'autres'],               email: 'msalah@lad.tn',    whatsapp: '+216 50 123 456', active: true },
-  { id: '2', name: 'Karim Bejaoui', site: 'Pôle Industriel, Jbel Oust (FAD)', categories: ['plomberie', 'climatisation'],          email: 'kbejaoui@fad.tn',  whatsapp: '+216 55 234 567', active: true },
-  { id: '3', name: 'Anis Trabelsi', site: 'Site Principal, Megrine (3Ps)',      categories: ['maconnerie', 'peinture', 'menuiserie'], email: 'atrabelsi@3ps.tn', whatsapp: '+216 52 345 678', active: true },
+  { id: 'vp-1',  name: 'Elkateb Électricité',      site: 'Ariana',        categories: ['electricite'],                      email: 'contact@elkateb-elec.tn',    whatsapp: '+216 71 234 567', active: true  },
+  { id: 'vp-2',  name: 'Tunisie Électrique SARL',  site: 'Ben Arous',     categories: ['electricite', 'climatisation'],     email: 'vente@tunisie-elec.tn',      whatsapp: '+216 70 123 456', active: true  },
+  { id: 'vp-3',  name: 'STEG Ingénierie',          site: 'Tunis',         categories: ['electricite'],                      email: 'ingenierie@steg.com.tn',     whatsapp: '+216 71 345 678', active: true  },
+  { id: 'vp-4',  name: 'Techno Hydraulique',       site: 'Jbel Oust',     categories: ['plomberie'],                        email: 'contact@techno-hyd.tn',      whatsapp: '+216 73 456 789', active: true  },
+  { id: 'vp-5',  name: 'Sarl Plomberie Pro',       site: 'Ben Arous',     categories: ['plomberie'],                        email: 'plomberie.pro@gmail.com',    whatsapp: '+216 71 567 890', active: true  },
+  { id: 'vp-6',  name: 'Climatech Services',       site: 'Ariana',        categories: ['climatisation'],                    email: 'info@climatech.tn',          whatsapp: '+216 71 678 901', active: true  },
+  { id: 'vp-7',  name: 'Froid Express Tunis',      site: 'Tunis',         categories: ['climatisation'],                    email: 'contact@froid-express.tn',   whatsapp: '+216 72 789 012', active: true  },
+  { id: 'vp-8',  name: 'Entreprise Ghazi BTP',     site: 'Ben Arous',     categories: ['maconnerie', 'peinture'],           email: 'ghazi.btp@gmail.com',        whatsapp: '+216 71 890 123', active: true  },
+  { id: 'vp-9',  name: 'Bâtiment Plus SARL',       site: 'Grombalia',     categories: ['maconnerie'],                       email: 'contact@batiment-plus.tn',   whatsapp: '+216 71 901 234', active: true  },
+  { id: 'vp-10', name: 'Peinture Moderne Tunis',   site: 'Tunis',         categories: ['peinture'],                         email: 'moderne.peinture@gmail.com', whatsapp: '+216 71 012 345', active: true  },
+  { id: 'vp-11', name: 'Menuiserie Artisanale',    site: 'Ben Arous',     categories: ['menuiserie'],                       email: 'contact@menuiserie-a.tn',    whatsapp: '+216 72 123 456', active: true  },
+  { id: 'vp-12', name: 'Bois & Design Tunis',      site: 'Ariana',        categories: ['menuiserie'],                       email: 'info@bois-design.tn',        whatsapp: '+216 73 234 567', active: true  },
+  { id: 'vp-13', name: 'Multi Services Maghreb',   site: 'Tunis',         categories: ['autres'],                           email: 'ms.maghreb@gmail.com',       whatsapp: '+216 71 111 222', active: true  },
 ];
 
 interface Fournisseur {
@@ -165,32 +176,60 @@ interface Fournisseur {
 
 const MOCK_FOURNISSEURS: Fournisseur[] = [
   {
-    id: 'f1', company: 'Elkateb Matériaux Électriques', contact: 'Sami Elkateb',
-    email: 'sami@elkateb-elec.tn', whatsapp: '+216 71 100 200',
+    id: 'vf-1', company: 'Maghreb Electric',       contact: 'Ali Maghrebi',
+    email: 'info@maghreb-electric.tn', whatsapp: '+216 70 456 789',
     address: 'Zone Industrielle Charguia II, 2035 Ariana',
     matricule_fiscale: '1001234/A/M/000',
-    categories: ['electricite', 'autres'], active: true,
+    categories: ['electricite'], active: true,
   },
   {
-    id: 'f2', company: 'TunisPlomb SARL', contact: 'Khaled Meddeb',
-    email: 'k.meddeb@tunisplomb.tn', whatsapp: '+216 55 300 400',
-    address: 'Rue de l\'Industrie, 2013 Ben Arous',
+    id: 'vf-2', company: 'SONELEC Tunisie',        contact: 'Riadh Sonelec',
+    email: 'contact@sonelec.tn', whatsapp: '+216 71 456 789',
+    address: 'Avenue de la Liberté, 1001 Tunis',
     matricule_fiscale: '1002345/B/P/000',
+    categories: ['electricite', 'climatisation'], active: true,
+  },
+  {
+    id: 'vf-3', company: 'Robinetterie Tunisie',   contact: 'Khaled Meddeb',
+    email: 'vente@robin-tn.com', whatsapp: '+216 55 300 400',
+    address: "Rue de l'Industrie, 2013 Ben Arous",
+    matricule_fiscale: '1003456/C/N/000',
     categories: ['plomberie'], active: true,
   },
   {
-    id: 'f3', company: 'ClimaTech Tunisie', contact: 'Nour Gharbi',
-    email: 'nour@climatech.tn', whatsapp: '+216 52 400 500',
+    id: 'vf-4', company: 'Sanitaire Plus SARL',    contact: 'Nour Gharbi',
+    email: 'contact@sanitaire-plus.tn', whatsapp: '+216 52 400 500',
     address: 'Avenue Habib Bourguiba, 2080 Ariana',
-    matricule_fiscale: '1003456/C/N/000',
+    matricule_fiscale: '1004567/D/M/000',
+    categories: ['plomberie'], active: true,
+  },
+  {
+    id: 'vf-5', company: 'Climatec Fournitures',   contact: 'Sana Cherif',
+    email: 'fournitures@climatec.tn', whatsapp: '+216 71 789 012',
+    address: 'Route de La Marsa, 2070 La Marsa',
+    matricule_fiscale: '1005678/E/M/000',
     categories: ['climatisation'], active: true,
   },
   {
-    id: 'f4', company: 'Bâti Pro Tunisie', contact: 'Riadh Boussema',
-    email: 'rboussema@batipro.tn', whatsapp: '+216 50 500 600',
+    id: 'vf-6', company: 'Ciments du Nord',        contact: 'Riadh Boussema',
+    email: 'vente@ciments-nord.tn', whatsapp: '+216 50 500 600',
     address: 'Route de Grombalia, 8070 Grombalia',
-    matricule_fiscale: '1004567/D/M/000',
-    categories: ['maconnerie', 'peinture', 'menuiserie'], active: true,
+    matricule_fiscale: '1006789/F/P/000',
+    categories: ['maconnerie'], active: true,
+  },
+  {
+    id: 'vf-7', company: 'Matériaux BTP Tunis',    contact: 'Fares Beltaief',
+    email: 'contact@mat-btp.tn', whatsapp: '+216 71 901 234',
+    address: 'Zone Industrielle La Charguia, 2035 Ariana',
+    matricule_fiscale: '1007890/G/M/000',
+    categories: ['maconnerie', 'peinture'], active: true,
+  },
+  {
+    id: 'vf-8', company: 'Leroy Merlin Pro TN',    contact: 'Ahmed Karray',
+    email: 'pro@leroymerlin.tn', whatsapp: '+216 71 012 345',
+    address: 'Centre Commercial Tunis City, 1082 Tunis',
+    matricule_fiscale: '1008901/H/M/000',
+    categories: ['peinture', 'menuiserie', 'electricite'], active: true,
   },
 ];
 
@@ -1352,12 +1391,28 @@ function PrestatairesTab({
     <div className="bg-white rounded-xl border border-slate-200">
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <div>
-          <div className="font-medium text-slate-900">Prestataires de service</div>
+          <div className="font-medium text-slate-900">Prestataires agréés</div>
           <div className="text-xs text-slate-400 mt-0.5">
-            Le site de base = aucun déplacement. Autres sites = déplacement requis (groupage recommandé).
+            Entreprises agréées par le DG pour soumissionner aux appels d&apos;offres par catégorie
           </div>
         </div>
         <span className="text-xs text-slate-400">{prestataires.filter(p => p.active).length} actifs · {prestataires.length} total</span>
+      </div>
+
+      {/* Résumé par catégorie */}
+      <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(CATEGORY_LABELS).map(([key, { label, icon }]) => {
+            const count = prestataires.filter(p => p.active && p.categories.includes(key)).length;
+            return (
+              <span key={key} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-600">
+                <span>{icon}</span>
+                <span className="font-medium">{label}</span>
+                <span className="text-slate-400">({count})</span>
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       <ul>
@@ -1381,7 +1436,7 @@ function PrestatairesTab({
         {!showAdd ? (
           <button onClick={() => setShowAdd(true)}
             className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors">
-            + Ajouter un prestataire
+            + Nouveau prestataire agréé
           </button>
         ) : (
           <div className="space-y-3">
@@ -1886,6 +1941,7 @@ export default function SettingsPage() {
     { key: 'users',       label: 'Utilisateurs' },
     { key: 'objectifs',   label: 'Objectifs KPI' },
     { key: 'alertes',    label: 'Alertes & Escalades' },
+    { key: 'email',      label: '✉ Email & Devis' },
   ];
 
   return (
@@ -2045,8 +2101,8 @@ export default function SettingsPage() {
         <div className="bg-white rounded-xl border border-slate-200">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
-              <div className="font-medium text-slate-900">Fournisseurs de matériel — Bons de Commande</div>
-              <div className="text-xs text-slate-400 mt-0.5">Fournisseurs agréés pour l&apos;approvisionnement en matériel de maintenance</div>
+              <div className="font-medium text-slate-900">Fournisseurs agréés</div>
+              <div className="text-xs text-slate-400 mt-0.5">Fournisseurs de matériaux et pièces agréés pour les bons de commande</div>
             </div>
             <span className="text-xs text-slate-400">{fournisseurs.filter(f => f.active).length} actifs · {fournisseurs.length} total</span>
           </div>
@@ -2074,6 +2130,150 @@ export default function SettingsPage() {
 
       {/* ── Alertes & Escalades ──────────────────────────────────────── */}
       {tab === 'alertes' && <AlertesTab />}
+
+      {/* ── Email & Devis ────────────────────────────────────────────── */}
+      {tab === 'email' && <EmailDevisTab />}
+    </div>
+  );
+}
+
+// ── Email & Devis tab ──────────────────────────────────────────────────────
+function EmailDevisTab() {
+  const [testResult, setTestResult] = useState<'idle' | 'testing' | 'ok' | 'err'>('idle');
+  const webhookUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/devis-inbound`
+    : '/api/devis-inbound';
+
+  async function testWebhook() {
+    setTestResult('testing');
+    try {
+      const res = await fetch('/api/devis-inbound');
+      setTestResult(res.ok ? 'ok' : 'err');
+    } catch {
+      setTestResult('err');
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div>
+        <h2 className="text-base font-semibold text-slate-900 mb-1">Réception des devis par email</h2>
+        <p className="text-sm text-slate-500">
+          Les fournisseurs et prestataires reçoivent un email de demande de devis avec la référence de l&apos;intervention dans le sujet.
+          Ils répondent en joignant leur devis — l&apos;application le récupère automatiquement via un webhook.
+        </p>
+      </div>
+
+      {/* Webhook URL */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+          <div className="font-semibold text-slate-800 text-sm">URL du webhook inbound</div>
+          <div className="text-xs text-slate-500 mt-0.5">À configurer dans votre provider email (Mailgun ou Postmark)</div>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-slate-900 text-green-400 text-sm font-mono px-4 py-2.5 rounded-lg overflow-x-auto">
+              POST {webhookUrl}
+            </code>
+            <button
+              onClick={() => navigator.clipboard.writeText(webhookUrl + '')}
+              className="shrink-0 px-3 py-2.5 text-xs border border-slate-200 rounded-lg hover:border-slate-400 transition-colors text-slate-600"
+            >
+              Copier
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={testWebhook}
+              disabled={testResult === 'testing'}
+              className="text-xs px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors disabled:opacity-50"
+            >
+              {testResult === 'testing' ? '⏳ Test…' : '▶ Tester le webhook'}
+            </button>
+            {testResult === 'ok' && <span className="text-xs text-green-600 font-medium">✓ Webhook actif et accessible</span>}
+            {testResult === 'err' && <span className="text-xs text-red-600">✗ Erreur — vérifiez l&apos;URL et le déploiement</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Format du sujet */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+          <div className="font-semibold text-slate-800 text-sm">Format des emails de demande de devis</div>
+        </div>
+        <div className="p-5 space-y-4 text-sm">
+          <div>
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Sujet envoyé aux prestataires/fournisseurs</div>
+            <code className="block bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-slate-800 font-mono text-xs">
+              Demande de devis — [DEM-2026-048] Réparation porte bureau P3
+            </code>
+          </div>
+          <div>
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Réponse attendue du fournisseur</div>
+            <ul className="space-y-1.5 text-slate-600">
+              <li className="flex items-start gap-2">
+                <span className="text-green-500 mt-0.5">✓</span>
+                Répondre à l&apos;email en gardant la référence dans le sujet (RE: DEM-2026-048…)
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-500 mt-0.5">✓</span>
+                Joindre le devis en PDF ou image (JPG/PNG)
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-500 mt-0.5">⚠</span>
+                Délai maximum : 96h (configurable dans Alertes & Escalades)
+              </li>
+            </ul>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800">
+            <strong>Devis papier :</strong> Si le fournisseur apporte un document papier, le prestataire peut le prendre en photo et l&apos;uploader directement dans l&apos;application (bouton &quot;+ Reçu&quot; dans la section devis).
+          </div>
+        </div>
+      </div>
+
+      {/* Configuration Mailgun */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+          <div className="font-semibold text-slate-800 text-sm">Configuration Mailgun</div>
+          <div className="text-xs text-slate-500 mt-0.5">Pour recevoir les devis dans Mailgun → Store & Forward</div>
+        </div>
+        <div className="p-5 space-y-3 text-sm text-slate-600">
+          <ol className="space-y-3 list-decimal list-inside">
+            <li>Dans Mailgun → Routes → Créer une règle</li>
+            <li>
+              Filtre :
+              <code className="ml-2 bg-slate-100 px-2 py-0.5 rounded text-xs font-mono">
+                match_header(&quot;subject&quot;, &quot;DEM-&quot;) OR match_header(&quot;subject&quot;, &quot;BC-&quot;)
+              </code>
+            </li>
+            <li>
+              Action :
+              <code className="ml-2 bg-slate-100 px-2 py-0.5 rounded text-xs font-mono">
+                forward(&quot;{webhookUrl}&quot;)
+              </code>
+            </li>
+            <li>Priorité : 10 · Cocher &quot;Stop processing&quot;</li>
+          </ol>
+        </div>
+      </div>
+
+      {/* Configuration Postmark */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+          <div className="font-semibold text-slate-800 text-sm">Configuration Postmark</div>
+          <div className="text-xs text-slate-500 mt-0.5">Inbound processing → webhook JSON</div>
+        </div>
+        <div className="p-5 text-sm text-slate-600 space-y-2">
+          <p>Dans Postmark → Servers → votre serveur → Settings → Inbound :</p>
+          <p>
+            <strong>Inbound webhook URL :</strong>{' '}
+            <code className="bg-slate-100 px-2 py-0.5 rounded text-xs font-mono">{webhookUrl}</code>
+          </p>
+          <p className="text-xs text-slate-400">
+            Postmark envoie du JSON application/json. Le webhook détecte automatiquement le format (Mailgun vs Postmark).
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

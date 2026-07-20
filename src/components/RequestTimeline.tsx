@@ -10,23 +10,19 @@ import { useMemo } from 'react';
 import type { RequestStatus } from '@/types';
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
-  draft: 'Brouillon',
-  pending_management_validation: 'Validation direction',
-  clarification: 'Clarification',
-  preparation: 'Préparation',
-  awaiting_materials: 'Attente matériaux',
-  ready_to_plan: 'Prête à planifier',
-  planned: 'Planifiée',
-  in_progress: "En cours d'exécution",
-  cancelled: 'Annulée',
-  completed_pending_confirmation: 'Attente confirmation',
-  accepted: 'Acceptée',
+  nouveau:        'Nouvelle',
+  en_attente:     'En attente',
+  appel_offre:    "Appel d'offres",
+  en_preparation: 'En préparation',
+  planifie:       'Planifiée',
+  en_cours:       "En cours",
+  a_confirmer:    'À confirmer',
+  termine:        'Terminée',
+  annule:         'Annulée',
 };
 
 const STATUS_ORDER: RequestStatus[] = [
-  'draft', 'pending_management_validation', 'clarification', 'preparation',
-  'awaiting_materials', 'ready_to_plan', 'planned', 'in_progress',
-  'completed_pending_confirmation', 'accepted',
+  'nouveau', 'en_attente', 'appel_offre', 'en_preparation', 'planifie', 'en_cours', 'a_confirmer', 'termine',
 ];
 
 export interface TimelineStep {

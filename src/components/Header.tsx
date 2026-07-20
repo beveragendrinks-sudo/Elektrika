@@ -19,11 +19,38 @@ const ROLE_BADGE: Record<string, string> = {
   demandeur:         'bg-green-100 text-green-700',
 };
 
-// Simule les notifications non lues — en prod : lecture depuis la table notifications
-const MOCK_NOTIF: Record<string, number> = {
-  directeur_de_site: 3,  // BCs draft à valider
-  electricien:       2,  // alertes SLA en cours
-  demandeur:         1,  // intervention terminée à confirmer
+interface MockNotification {
+  id: string;
+  title: string;
+  body: string;
+  href: string;
+  time: string;
+  read: boolean;
+  icon: string;
+}
+
+const ago = (h: number) => {
+  if (h < 1) return `il y a ${Math.round(h * 60)} min`;
+  return `il y a ${Math.round(h)}h`;
+};
+
+const MOCK_NOTIFICATIONS: Record<string, MockNotification[]> = {
+  directeur_de_site: [
+    { id: 'n1', title: 'BC en attente de validation', body: 'BC-LAD-2026-000041 — Variateur de fréquence · 742,500 TND', href: '/bons-de-commande/bc-1', time: ago(2), read: false, icon: '📋' },
+    { id: 'n2', title: 'Devis reçu — DEM-2026-048', body: 'Bois & Design Tunis — 1 850 TND · Menuiserie', href: '/demandes/5', time: ago(4), read: false, icon: '📄' },
+    { id: 'n3', title: 'Escalade SLA — DEM-2026-049', body: 'Fissures mur parking · 96h dépassées sans action', href: '/demandes/6', time: ago(8), read: true, icon: '🚨' },
+  ],
+  directeur_general: [
+    { id: 'n4', title: 'Escalade SLA groupe', body: '3 demandes dépassent le seuil 96h — intervention requise', href: '/demandes', time: ago(1), read: false, icon: '🚨' },
+    { id: 'n5', title: 'Budget LAD — 72% consommé', body: 'Alerte budget · 92 800 / 130 000 TND engagés', href: '/kpi', time: ago(12), read: false, icon: '💰' },
+  ],
+  electricien: [
+    { id: 'n6', title: 'Nouvelle mission planifiée', body: 'DEM-2026-041 · Siège Ben Arous · Demain 08h00', href: '/dashboard/electricien', time: ago(0.5), read: false, icon: '📅' },
+    { id: 'n7', title: 'Confirmation requise', body: 'DEM-2026-035 — Climatiseur H4 · En attente depuis 4h', href: '/demandes/3', time: ago(4), read: true, icon: '✅' },
+  ],
+  demandeur: [
+    { id: 'n8', title: 'Intervention planifiée', body: 'DEM-2026-041 · Panne disjoncteur · Demain 09h30', href: '/demandes/1', time: ago(3), read: false, icon: '📅' },
+  ],
 };
 
 function buildNavLinks(role: string): { href: string; label: string }[] {
@@ -79,15 +106,23 @@ function displayName(email: string): string {
 export default function Header() {
   const router   = useRouter();
   const pathname = usePathname();
-  const [session, setSession]   = useState<FMSession | null>(null);
-  const [mounted, setMounted]   = useState(false);
+  const [session, setSession]         = useState<FMSession | null>(null);
+  const [mounted, setMounted]         = useState(false);
+  const [notifOpen, setNotifOpen]     = useState(false);
+  const [notifications, setNotifications] = useState<MockNotification[]>([]);
 
   useEffect(() => {
     setMounted(true);
     try {
       const raw = localStorage.getItem('fm_session');
-      if (raw) setSession(JSON.parse(raw));
-      else      setSession(null);
+      if (raw) {
+        const parsed: FMSession = JSON.parse(raw);
+        setSession(parsed);
+        const roleNotifs = MOCK_NOTIFICATIONS[parsed.role] ?? [];
+        setNotifications(roleNotifs);
+      } else {
+        setSession(null);
+      }
     } catch {
       setSession(null);
     }
@@ -99,8 +134,7 @@ export default function Header() {
     router.push('/login');
   }
 
-  const notifCount = session ? (MOCK_NOTIF[session.role] ?? 0) : 0;
-  const navLinks   = session ? buildNavLinks(session.role) : [];
+  const navLinks = session ? buildNavLinks(session.role) : [];
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
@@ -135,21 +169,72 @@ export default function Header() {
 
             {/* Cloche + identité + déconnexion */}
             <div className="flex items-center gap-2 shrink-0">
-              {session && notifCount > 0 && (
-                <Link
-                  href={session.dashboard}
-                  title={`${notifCount} notification${notifCount > 1 ? 's' : ''}`}
-                  className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
-                >
-                  <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                    />
-                  </svg>
-                  <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                    {notifCount}
-                  </span>
-                </Link>
+              {session && notifications.length > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setNotifOpen(o => !o)}
+                    className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                      />
+                    </svg>
+                    {notifications.filter(n => !n.read).length > 0 && (
+                      <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                        {notifications.filter(n => !n.read).length}
+                      </span>
+                    )}
+                  </button>
+
+                  {notifOpen && (
+                    <>
+                      {/* Overlay pour fermer en cliquant ailleurs */}
+                      <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
+
+                      {/* Dropdown panel */}
+                      <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-slate-200 shadow-xl z-20 overflow-hidden">
+                        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                          <div className="font-semibold text-slate-900 text-sm">Notifications</div>
+                          {notifications.some(n => !n.read) && (
+                            <button
+                              onClick={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+                              className="text-xs text-blue-600 hover:underline"
+                            >
+                              Tout marquer lu
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
+                          {notifications.map(n => (
+                            <Link
+                              key={n.id}
+                              href={n.href}
+                              onClick={() => {
+                                setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+                                setNotifOpen(false);
+                              }}
+                              className={`flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors ${!n.read ? 'bg-blue-50/40' : ''}`}
+                            >
+                              <span className="text-base shrink-0 mt-0.5">{n.icon}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className={`text-sm leading-tight ${!n.read ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>
+                                  {n.title}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-0.5 leading-tight truncate">{n.body}</div>
+                                <div className="text-[10px] text-slate-400 mt-1">{n.time}</div>
+                              </div>
+                              {!n.read && <div className="w-2 h-2 bg-blue-500 rounded-full shrink-0 mt-2" />}
+                            </Link>
+                          ))}
+                        </div>
+                        {notifications.every(n => n.read) && (
+                          <div className="px-4 py-6 text-center text-sm text-slate-400">Aucune notification non lue</div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
 
               {session ? (

@@ -12,11 +12,12 @@ interface EntityProfile {
 }
 
 const ENTITY_PROFILES: Record<string, EntityProfile> = {
-  LAD:   { full_name: 'Société LAD',    address: 'Zone Industrielle Charguia II, 2035 Ariana', phone: '+216 71 234 000', matricule_fiscale: '1234567/A/M/000' },
-  FAD:   { full_name: 'Société FAD',    address: 'Rue des Entrepreneurs, 2010 Tunis',           phone: '+216 71 345 111', matricule_fiscale: '2345678/B/M/000' },
-  BTFI:  { full_name: 'BTFI S.A.',      address: 'Avenue Habib Bourguiba, 1000 Tunis',          phone: '+216 71 456 222', matricule_fiscale: '3456789/C/M/000' },
-  '3Ps': { full_name: '3Ps Industrie',  address: 'Route de Sfax km 8, 2040 Radès',             phone: '+216 71 567 333', matricule_fiscale: '4567890/D/M/000' },
-  'K&Ko':{ full_name: 'K&Ko Services',  address: 'Zone Franche Bizerte, 7020 Bizerte',         phone: '+216 72 678 444', matricule_fiscale: '5678901/E/M/000' },
+  LAD:     { full_name: 'Société LAD',      address: 'Zone Industrielle Charguia II, 2035 Ariana', phone: '+216 71 234 000', matricule_fiscale: '1234567/A/M/000' },
+  FAD:     { full_name: 'Société FAD',      address: 'Rue des Entrepreneurs, 2010 Tunis',           phone: '+216 71 345 111', matricule_fiscale: '2345678/B/M/000' },
+  BTFI:    { full_name: 'BTFI S.A.',        address: 'Avenue Habib Bourguiba, 1000 Tunis',          phone: '+216 71 456 222', matricule_fiscale: '3456789/C/M/000' },
+  '3Ps':   { full_name: '3Ps Industrie',    address: 'Route de Sfax km 8, 2040 Radès',             phone: '+216 71 567 333', matricule_fiscale: '4567890/D/M/000' },
+  'K&Ko':  { full_name: 'K&Ko Services',    address: 'Zone Franche Bizerte, 7020 Bizerte',         phone: '+216 72 678 444', matricule_fiscale: '5678901/E/M/000' },
+  'Privée':{ full_name: 'Propriété Privée', address: '12 Rue des Oliviers, 2080 Ariana',           phone: '+216 71 789 555', matricule_fiscale: '6789012/F/P/000' },
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -55,6 +56,45 @@ interface OTData {
 
 // ── Mock data ─────────────────────────────────────────────────────────────────
 const MOCK_OTS: Record<string, OTData> = {
+  'ot-2': {
+    ot_id: 'ot-2', ot_number: 'OT-LAD-2026-000023',
+    emission_date: '15/07/2026', mission_date: '15/07/2026',
+    entity_code: 'LAD', electrician: 'Mohamed Salah', status: 'in_progress',
+    demande: {
+      request_id: '2', ref: 'DR-LAD-2026-000002',
+      title: 'Remplacement fusible armoire B3', site: 'Siège Ben Arous',
+      type_label: 'Dépannage / Panne simple',
+      location: 'Armoire de distribution B3 — bâtiment principal, rez-de-chaussée',
+      safety_risk: false, production_stop: false,
+      ai_diagnosis: 'Fusible grillé suite à surcharge transitoire. Vérifier la charge en aval avant remplacement. Contrôler l\'état des bornes de connexion.',
+      ai_materials: [
+        { description: 'Fusible cylindrique 25A gG 10×38mm', quantity: 3, unit: 'pièce' },
+      ],
+    },
+    validated_bcs: [],
+  },
+  'ot-3': {
+    ot_id: 'ot-3', ot_number: 'OT-LAD-2026-000022',
+    emission_date: '14/07/2026', mission_date: '14/07/2026',
+    entity_code: 'LAD', electrician: 'Mohamed Salah', status: 'completed',
+    demande: {
+      request_id: '3', ref: 'DR-LAD-2026-000003',
+      title: 'Câblage armoire AT-04', site: 'Siège Ben Arous',
+      type_label: 'Travaux électriques',
+      location: 'Armoire AT-04 — salle des machines, niveau 2',
+      safety_risk: false, production_stop: false,
+      ai_diagnosis: 'Câblage à refaire suite à modification du schéma électrique. Respect des codes couleurs NF C 15-100. Mise à jour du schéma synoptique.',
+      ai_materials: [
+        { description: 'Câble H07V-K 2.5mm² (rouge)', quantity: 30, unit: 'ml' },
+        { description: 'Câble H07V-K 2.5mm² (bleu)', quantity: 30, unit: 'ml' },
+        { description: 'Câble H07V-K 2.5mm² (vert/jaune)', quantity: 10, unit: 'ml' },
+        { description: 'Embout de câblage E2508 — lot 100', quantity: 1, unit: 'lot' },
+      ],
+    },
+    validated_bcs: [
+      { bc_id: 'bc-2', po_number: 'BC-LAD-2026-000038', supplier: 'Tunisie Électrique', lines_summary: 'Câbles + disjoncteur', total: 320 },
+    ],
+  },
   'ot-1': {
     ot_id: 'ot-1', ot_number: 'OT-LAD-2026-000024',
     emission_date: '02/07/2026', mission_date: '02/07/2026',
@@ -111,6 +151,117 @@ const MOCK_OTS: Record<string, OTData> = {
     },
     validated_bcs: [
       { bc_id: 'bc-1', po_number: 'BC-LAD-2026-000041', supplier: 'Elkateb Electricité', lines_summary: 'Variateur + câbles + connecteurs', total: 742.5 },
+    ],
+  },
+  'ot-6': {
+    ot_id: 'ot-6', ot_number: 'OT-FAD-2026-000011',
+    emission_date: '14/07/2026', mission_date: '14/07/2026',
+    entity_code: 'FAD', electrician: 'Karim Bejaoui', status: 'in_progress',
+    demande: {
+      request_id: '6', ref: 'DR-FAD-2026-000006',
+      title: 'Fuite canalisation atelier C — eau froide', site: 'Pôle Industriel Jbel Oust',
+      type_label: 'Dépannage / Panne simple',
+      location: 'Réseau eau froide — atelier C, mur nord',
+      safety_risk: false, production_stop: false,
+      ai_diagnosis: 'Fuite sur raccord compression DN25. Probable corrosion du raccord. Couper l\'alimentation en eau avant intervention. Remplacer le raccord et vérifier l\'ensemble du réseau aval.',
+      ai_materials: [
+        { description: 'Raccord compression DN25 laiton', quantity: 2, unit: 'pièce' },
+        { description: 'Joint torique 25mm — sachet 10', quantity: 1, unit: 'sachet' },
+      ],
+    },
+    validated_bcs: [],
+  },
+  'ot-7': {
+    ot_id: 'ot-7', ot_number: 'OT-LAD-2026-000020',
+    emission_date: '14/07/2026', mission_date: '16/07/2026',
+    entity_code: 'LAD', electrician: 'Anis Trabelsi', status: 'planned',
+    demande: {
+      request_id: '7', ref: 'DR-LAD-2026-000007',
+      title: 'Climatiseur salle serveurs hors service', site: 'Siège Ben Arous',
+      type_label: 'Réparation avec matériel',
+      location: 'Salle serveurs — niveau 1, local technique',
+      safety_risk: false, production_stop: false,
+      ai_diagnosis: 'Unité extérieure hors service — code erreur E4 (fuite de gaz frigorigène). Recharge en R410A requise après détection et colmatage de la fuite. Prévoir kit de recharge et détecteur de fuite.',
+      ai_materials: [
+        { description: 'Gaz R410A (bouteille 10kg)', quantity: 1, unit: 'bouteille' },
+        { description: 'Kit joint + raccord flare 1/4"', quantity: 1, unit: 'kit' },
+      ],
+    },
+    validated_bcs: [],
+  },
+  'ot-9': {
+    ot_id: 'ot-9', ot_number: 'OT-FAD-2026-000012',
+    emission_date: '13/07/2026', mission_date: '18/07/2026',
+    entity_code: 'FAD', electrician: 'Hichem Trabelsi', status: 'planned',
+    demande: {
+      request_id: '9', ref: 'DR-FAD-2026-000009',
+      title: 'Remplacement pompe hydraulique P-12', site: 'Pôle Industriel Jbel Oust',
+      type_label: 'Réparation avec matériel',
+      location: 'Salle des machines — circuit hydraulique principal',
+      safety_risk: false, production_stop: true,
+      ai_diagnosis: 'Pompe hydraulique à engrenages P-12 hors service — usure avancée des dentures confirmée par analyse vibratoire. Remplacement complet de la pompe recommandé.',
+      ai_materials: [
+        { description: 'Pompe hydraulique à engrenages 18cc/tr', quantity: 1, unit: 'pièce' },
+        { description: "Joint d'étanchéité kit complet", quantity: 2, unit: 'kit' },
+        { description: 'Huile hydraulique HM46 (bidon 20L)', quantity: 1, unit: 'bidon' },
+      ],
+    },
+    validated_bcs: [
+      { bc_id: 'bc-5', po_number: 'BC-FAD-2026-000042', supplier: 'Techno Hydraulique Tunisie', lines_summary: 'Pompe + joints + huile', total: 1380 },
+    ],
+  },
+  'ot-10': {
+    ot_id: 'ot-10', ot_number: 'OT-BTFI-2026-000008',
+    emission_date: '09/07/2026', mission_date: '21/07/2026',
+    entity_code: 'BTFI', electrician: 'Anis Trabelsi', status: 'planned',
+    demande: {
+      request_id: '10', ref: 'DR-BTFI-2026-000010',
+      title: 'Fissures mur porteur entrepôt Est', site: 'Entrepôt Est, Grombalia',
+      type_label: 'Travaux de maçonnerie',
+      location: 'Mur porteur B-Est — entrepôt Est, côté nord',
+      safety_risk: true, production_stop: false,
+      ai_diagnosis: 'Fissures structurelles sur mur porteur. Expertise requise avant travaux. Périmètre de sécurité à mettre en place. Reprise en sous-œuvre possible selon diagnostic béton armé.',
+      ai_materials: [
+        { description: 'Mortier de réparation structurelle', quantity: 3, unit: 'sac 25kg' },
+        { description: 'Résine d\'injection époxy', quantity: 2, unit: 'cartouche 300ml' },
+      ],
+    },
+    validated_bcs: [],
+  },
+  'ot-11': {
+    ot_id: 'ot-11', ot_number: 'OT-FAD-2026-000013',
+    emission_date: '16/07/2026', mission_date: '17/07/2026',
+    entity_code: 'FAD', electrician: 'Mohamed Salah', status: 'planned',
+    demande: {
+      request_id: '11', ref: 'DR-FAD-2026-000011',
+      title: 'Maintenance préventive armoire P2', site: 'Pôle Industriel Jbel Oust',
+      type_label: 'Contrôle / Vérification périodique',
+      location: 'Armoire de puissance P2 — atelier B, rangée 2',
+      safety_risk: false, production_stop: false,
+      ai_diagnosis: 'Maintenance préventive planifiée. Vérifier l\'état des contacts, la continuité des jeux de barres, resserrage des borniers, nettoyage des filtres ventilation.',
+      ai_materials: [],
+    },
+    validated_bcs: [],
+  },
+  'ot-12': {
+    ot_id: 'ot-12', ot_number: 'OT-LAD-2026-000028',
+    emission_date: '10/07/2026', mission_date: '21/07/2026',
+    entity_code: 'LAD', electrician: 'Anis Trabelsi', status: 'planned',
+    demande: {
+      request_id: '12', ref: 'DR-LAD-2026-000012',
+      title: 'Peinture couloir administratif — bâtiment A', site: 'Siège Ben Arous',
+      type_label: 'Travaux de peinture',
+      location: 'Couloir A3 — bâtiment administratif, rez-de-chaussée',
+      safety_risk: false, production_stop: false,
+      ai_diagnosis: 'Peinture dégradée sur 45m² environ. Préparation de surface (ponçage, enduit), application 2 couches peinture lessivable blanc cassé. Prévoir protection sol et mobilier.',
+      ai_materials: [
+        { description: 'Enduit de lissage — sac 25kg', quantity: 2, unit: 'sac' },
+        { description: 'Peinture lessivable blanc cassé — pot 15L', quantity: 3, unit: 'pot' },
+        { description: 'Papier de verre grain 120', quantity: 5, unit: 'feuille' },
+      ],
+    },
+    validated_bcs: [
+      { bc_id: 'bc-6', po_number: 'BC-LAD-2026-000043', supplier: 'Peintures & Déco Tunis', lines_summary: 'Enduit + peinture + abrasif', total: 480 },
     ],
   },
   'ot-8': {

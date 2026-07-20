@@ -1,18 +1,14 @@
 import Link from 'next/link';
 import NewBCForm from './NewBCForm';
-
-// Mock demande data — sera remplacé par fetch Supabase
-const MOCK_DEMANDES: Record<string, { title: string; site: string; type: string; entity: string; status: string }> = {
-  '1': { title: 'Panne tableau TGS-B2', site: 'Siège Ben Arous', type: 'Panne simple', entity: 'LAD', status: 'Clarification en cours' },
-  '4': { title: 'Disjoncteur Atelier C', site: 'Pôle Industriel Jbel Oust', type: 'Panne simple', entity: 'LAD', status: 'Planifiée' },
-  '5': { title: 'Remplacement variateur V-08', site: 'Megrine', type: 'Réparation avec matériel', entity: 'LAD', status: 'Préparation' },
-};
+import { MOCK_INTERVENTIONS } from '@/lib/interventionData';
+import type { DemandeOption } from './NewBCForm';
 
 const MOCK_SUPPLIERS = [
-  { id: 'sup-1', name: 'Elkateb Electricité', contact: 'M. Adnen Elkateb', phone: '+216 71 234 567', email: 'contact@elkateb.tn' },
-  { id: 'sup-2', name: 'Tunisie Électrique', contact: 'M. Kamel Ben Ali', phone: '+216 70 123 456', email: 'vente@tunisie-elec.tn' },
-  { id: 'sup-3', name: 'STEG Matériaux', contact: 'Mme. Sana Trabelsi', phone: '+216 71 345 678', email: 'steg-mat@steg.com.tn' },
-  { id: 'sup-4', name: 'Maghreb Electric', contact: 'M. Hichem Mansouri', phone: '+216 70 456 789', email: 'info@maghreb-electric.tn' },
+  { id: 'sup-1', name: 'Elkateb Electricité',  contact: 'M. Adnen Elkateb',    phone: '+216 71 234 567', email: 'contact@elkateb.tn'       },
+  { id: 'sup-2', name: 'Tunisie Électrique',    contact: 'M. Kamel Ben Ali',     phone: '+216 70 123 456', email: 'vente@tunisie-elec.tn'    },
+  { id: 'sup-3', name: 'STEG Matériaux',        contact: 'Mme. Sana Trabelsi',   phone: '+216 71 345 678', email: 'steg-mat@steg.com.tn'     },
+  { id: 'sup-4', name: 'Maghreb Electric',       contact: 'M. Hichem Mansouri',   phone: '+216 70 456 789', email: 'info@maghreb-electric.tn' },
+  { id: 'sup-5', name: 'Techno Hydraulique',     contact: 'M. Sami Mrad',         phone: '+216 73 456 789', email: 'sami.mrad@techno-hyd.tn'  },
 ];
 
 interface Props {
@@ -20,18 +16,29 @@ interface Props {
 }
 
 export default function NewBCPage({ searchParams }: Props) {
-  const requestId = searchParams.request_id ?? '';
-  const demande = MOCK_DEMANDES[requestId] ?? null;
+  const initialRequestId = searchParams.request_id ?? '';
+
+  // Demandes en préparation — en prod: filtrées par l'entité et les assignations de l'utilisateur courant
+  const demandesEnPrep: DemandeOption[] = MOCK_INTERVENTIONS
+    .filter(i => i.status === 'en_preparation')
+    .map(i => ({
+      id:       i.id,
+      ref:      i.ref,
+      title:    i.title,
+      site:     i.site,
+      entity:   i.entity,
+      category: i.category,
+    }));
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto px-4 sm:px-0">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-slate-500 mb-6">
         <Link href="/demandes" className="hover:text-slate-900 transition-colors">Demandes</Link>
         <span>/</span>
-        {requestId && (
+        {initialRequestId && (
           <>
-            <Link href={`/demandes/${requestId}`} className="hover:text-slate-900 transition-colors">#{requestId}</Link>
+            <Link href={`/demandes/${initialRequestId}`} className="hover:text-slate-900 transition-colors">#{initialRequestId}</Link>
             <span>/</span>
           </>
         )}
@@ -41,16 +48,15 @@ export default function NewBCPage({ searchParams }: Props) {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Nouveau Bon de Commande</h1>
         <p className="text-slate-500 mt-1 text-sm">
-          Créez un BC pour commander les matériaux ou prestations nécessaires à cette intervention.
+          Sélectionnez une demande en préparation, choisissez un fournisseur et joignez les devis comparatifs.
         </p>
       </div>
 
       <NewBCForm
-        requestId={requestId}
-        demande={demande}
+        initialRequestId={initialRequestId}
+        demandesEnPrep={demandesEnPrep}
         suppliers={MOCK_SUPPLIERS}
         electricianName="Mohamed Salah"
-        entity="LAD"
       />
     </div>
   );

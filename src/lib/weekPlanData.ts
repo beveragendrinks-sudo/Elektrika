@@ -37,21 +37,21 @@ export const TYPE_COLOR: Record<1 | 2 | 3, string> = {
 
 export const WEEK_PLAN: WeekDay[] = [
   {
-    key: 'lun', label: 'Lundi', shortLabel: 'Lun', date: '30/06', isPast: true,
+    key: 'lun', label: 'Lundi', shortLabel: 'Lun', date: '14/07', isPast: true,
     missions: [
       { id: '3', ot_id: 'ot-3', title: 'Câblage armoire AT-04', site: 'Siège Ben Arous', type: 3, points: 5 },
       { id: '6', ot_id: 'ot-6', title: 'Vérif. disj. ligne D', site: 'Siège Ben Arous', type: 1, points: 1 },
     ],
   },
   {
-    key: 'mar', label: 'Mardi', shortLabel: 'Mar', date: '01/07', isPast: true,
+    key: 'mar', label: 'Mardi', shortLabel: 'Mar', date: '15/07', isPast: true,
     missions: [
       { id: '1', ot_id: 'ot-1', title: 'Panne tableau TGS-B2', site: 'Siège Ben Arous', type: 1, points: 1 },
-      { id: '7', ot_id: 'ot-7', title: 'Fusible armoire B3', site: 'Siège Ben Arous', type: 1, points: 1 },
+      { id: '2', ot_id: 'ot-2', title: 'Remplacement fusible armoire B3', site: 'Siège Ben Arous', type: 1, points: 1 },
     ],
   },
   {
-    key: 'mer', label: 'Mercredi', shortLabel: 'Mer', date: '02/07', isToday: true,
+    key: 'mer', label: 'Mercredi', shortLabel: 'Mer', date: '16/07', isToday: true,
     missions: [
       {
         id: '4', ot_id: 'ot-4', title: 'Disjoncteur Atelier C', site: 'Pôle Industriel Jbel Oust',
@@ -66,7 +66,7 @@ export const WEEK_PLAN: WeekDay[] = [
     ],
   },
   {
-    key: 'jeu', label: 'Jeudi', shortLabel: 'Jeu', date: '03/07',
+    key: 'jeu', label: 'Jeudi', shortLabel: 'Jeu', date: '17/07',
     missions: [
       {
         id: '5', ot_id: 'ot-5', title: 'Remplacement variateur V-08', site: 'Megrine',
@@ -76,7 +76,7 @@ export const WEEK_PLAN: WeekDay[] = [
     ],
   },
   {
-    key: 'ven', label: 'Vendredi', shortLabel: 'Ven', date: '04/07',
+    key: 'ven', label: 'Vendredi', shortLabel: 'Ven', date: '18/07',
     missions: [],
   },
 ];
